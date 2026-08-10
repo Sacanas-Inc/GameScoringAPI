@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: gamescoringapi-test-db
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: gamescoringapi_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - test-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  test-db-volume:

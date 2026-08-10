@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
 
 
 public class MatchForGameDto
@@ -27,36 +29,65 @@ public static class GetGameEndpoints
     public static void MapGetGameEndpoints(this WebApplication app)
     {
 
-        app.MapGet("/game/{id}", async (int id, GameDBContext context) =>
+        app.MapGet("/game/{id}", async (int id, IGameService gameService) =>
         {
-            var game = await context.Games.FindAsync(id);
-            if (game == null)
+            try
             {
-                return Results.NotFound($"Game with ID {id} not found.");
+                var game = await gameService.GetGameByIdAsync(id);
+                return Results.Ok(game);
             }
-
-            return Results.Ok(game);
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+            catch (ServiceException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("GetGameById")
         .WithTags("1. Games", "GET Endpoints", "9. FrontEnd - Mockup")
         .WithOpenApi();
 
 
-        app.MapGet("/games", async (int? id, string? descripiton, GameDBContext context) =>
+        app.MapGet("/games", async (int? id, string? description, IGameService gameService) =>
         {
-            IQueryable<Game> gamesQuery = context.Games;
-            if(id != null)
-                gamesQuery = gamesQuery.Where(g => g.Id == id);
-
-            if (!string.IsNullOrEmpty(descripiton))
-                gamesQuery = gamesQuery.Where(g => g.GameDescription.Contains(descripiton));
-            
-            var games = await gamesQuery.ToListAsync();
-            if (games == null || games.Count() == 0)
+            try
             {
-                return Results.NotFound($"No games found with provided params.");
+                var games = await gameService.GetAllGamesAsync();
+
+                // Filter by ID if provided
+                if (id.HasValue)
+                {
+                    games = games.Where(g => g.Id == id.Value).ToList();
+                    if (!games.Any())
+                    {
+                        return Results.NotFound(new { error = "No games found with provided params." });
+                    }
+                }
+
+                // Filter by description if provided
+                if (!string.IsNullOrWhiteSpace(description))
+                {
+                    games = games.Where(g => g.GameDescription != null && g.GameDescription.Contains(description, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (!games.Any())
+                    {
+                        return Results.Ok(new List<GameDto>()); // Return empty list with 200 OK
+                    }
+                }
+
+                // If no filters provided and no games exist
+                if (!games.Any())
+                {
+                    return Results.NotFound(new { error = "No games found." });
+                }
+
+                return Results.Ok(games);
             }
-            return Results.Ok(games);
+            catch (ServiceException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("GetAllGames")
         .WithTags("1. Games", "GET Endpoints", "9. FrontEnd - Mockup")

@@ -1,0 +1,9 @@
+{
+    "csharp-dev-tools.solutionViewer.selectedWorkspaceSolutions": [
+        "GameScoringAPI.sln",
+        "Api/Api.sln"
+    ],
+    "chat.tools.terminal.autoApprove": {
+        "dotnet test": true
+    }
+}

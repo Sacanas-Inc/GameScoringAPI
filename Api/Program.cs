@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using GameScoringAPI.Extensions;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Validators;
+using GameScoringAPI.Mapper;
 
 // builder created using extension method
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +29,15 @@ builder.Services.AddCors(options =>
 
 // Configure database services (DbContext) and connection.
 builder.ConfigureDatabaseServices();
+
+// Register application services
+builder.Services.AddScoped<IGameValidator, GameValidator>();
+builder.Services.AddScoped<IGameService, GameService>();
+builder.Services.AddScoped<IMatchValidator, MatchValidator>();
+builder.Services.AddScoped<IMatchService, MatchService>();
+builder.Services.AddScoped<IMatchDataPointValidator, MatchDataPointValidator>();
+builder.Services.AddScoped<IMatchDataPointService, MatchDataPointService>();
+builder.Services.AddScoped<MatchMapper>();
 
 
 var app = builder.Build();

@@ -1,4 +1,6 @@
 using GameScoringAPI.Mapper;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 public class MatchForMatchDto
@@ -28,68 +30,54 @@ public static class GetMatchEndpoints
 {
     public static void MapGetMatchEndpoints(this WebApplication app)
     {    
-        app.MapGet("/match/{id}", async (int id, bool? includeDataPoints, GameDBContext context) =>
+        app.MapGet("/match/{id}", async (int id, bool? includeDataPoints, IMatchService matchService) =>
         {
-            // Our Queriyable Mathch and corresponding DTO.
-            IQueryable<MatchForMatchDto> matchesQuery;
-            IQueryable<Match> query = context.Matches.AsQueryable();
-
-            query = query.Where(m => m.Id == id);
-
-            // Selects and mapps the data from the models to the DTOs.
-            matchesQuery = MatchMapper.SelectAndMapToDTO(query, includeDataPoints);
-
-            // Execute our query.
-            MatchForMatchDto? match = await matchesQuery.FirstOrDefaultAsync();
-           
-            if (match == null)
-                return Results.NotFound($"Match with ID {id} not found.");
-
-            // Include datapoints if necessary.
-            if (includeDataPoints is not null && (bool)includeDataPoints) 
+            try
             {
-                match.MatchStats = MatchMapper.CreateMathStatsFor(match);
-                // Now let's calculate the winning player for each match
-                MatchMapper.CalculateWinnerFor(match);
+                var match = await matchService.GetMatchByIdAsync(id, includeDataPoints ?? false);
+                return Results.Ok(match);
             }
-
-            return Results.Ok(match);
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("GetMatch")
         .WithTags("2. Matches", "GET Endpoints", "9. FrontEnd - Mockup")
         .WithOpenApi(); 
 
 
-        app.MapGet("/matches", async (bool? includeDataPoints, int? gameId, GameDBContext context) =>
+        app.MapGet("/matches", async (bool? includeDataPoints, int? gameId, IMatchService matchService) =>
         {
-            // Our Queriyable Mathch and corresponding DTO.
-            IQueryable<MatchForMatchDto> matchesQuery;
-            IQueryable<Match> query = context.Matches.AsQueryable();
-            
-            // Apply filter if gameId is provided.
-            if (gameId.HasValue) 
-                query = query.Where(m => m.GameId == gameId.Value);
-
-            // Selects and mapps the data from the models to the DTOs.
-            matchesQuery = MatchMapper.SelectAndMapToDTO(query, includeDataPoints);
-
-            // Execute our query.
-            List<MatchForMatchDto> matches = await matchesQuery.ToListAsync();
-
-            // Include datapoints if necessary.
-            if (includeDataPoints is not null && (bool)includeDataPoints) 
-                foreach (MatchForMatchDto match in matches)
-                {
-                    match.MatchStats = MatchMapper.CreateMathStatsFor(match);
-                    // Now let's calculate the winning player for each match
-                    MatchMapper.CalculateWinnerFor(match);
-                }
+            try
+            {
+                var matches = await matchService.GetAllMatchesAsync();
                 
-            // Final endpoint not found validation.            
-            if(matches == null || matches.Count == 0)
-                return Results.NotFound($"No matches found.");
+                // Apply filter if gameId is provided
+                if (gameId.HasValue)
+                    matches = matches.Where(m => m.GameId == gameId.Value);
 
-            return Results.Ok(matches);
+                var matchList = matches.ToList();
+
+                // Include stats and calculate winner if necessary
+                if (includeDataPoints is true)
+                {
+                    foreach (var match in matchList)
+                    {
+                        if (match.MatchDataPoints?.Count > 0)
+                        {
+                            match.MatchStats = new MatchMapper().CreateMathStatsFor(match);
+                            new MatchMapper().CalculateWinnerFor(match);
+                        }
+                    }
+                }
+
+                return Results.Ok(matchList);
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { error = ex.Message }, statusCode: 500);
+            }
         })
         .WithName("GetAllMatches")
         .WithTags("2. Matches", "GET Endpoints", "9. FrontEnd - Mockup")

@@ -1,18 +1,21 @@
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
+
 public static class DeleteMatchDataPointEndpoints
 {
     public static void MapDeleteMatchDataPointEndpoints(this WebApplication app)
     {
-        app.MapDelete("/match-data-point/{id}", async (int id, GameDBContext context) =>
+        app.MapDelete("/match-data-point/{id}", async (int id, IMatchDataPointService dataPointService) =>
         {
-            var matchdp = await context.MatchDataPoints.FindAsync(id);
-            if (matchdp == null)
-                return Results.NotFound($"Match Data Point with ID {id} not found.");
-
-            // Delete the match
-            context.MatchDataPoints.Remove(matchdp);
-            await context.SaveChangesAsync();
-
-            return Results.NoContent();
+            try
+            {
+                await dataPointService.DeleteMatchDataPointAsync(id);
+                return Results.NoContent();
+            }
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("DeleteMatchDataPoint")
         .WithTags("3. MatchDataPoints", "DELETE Endpoints")
@@ -26,28 +29,25 @@ public static class DeleteMatchDataPointEndpoints
 
 
 
-        app.MapDelete("/match-data-points", async (GameDBContext context, params int[] ids) =>
+        app.MapDelete("/match-data-points", async (IMatchDataPointService dataPointService, params int[] ids) =>
         {
             if (ids == null || ids.Length == 0)
             {
-                return Results.BadRequest("No Match Data Point IDs provided."); // Return a 400 Bad Request response
+                return Results.BadRequest("No Match Data Point IDs provided.");
             }
 
-            foreach (var id in ids)
+            try
             {
-                var matchdp = await context.MatchDataPoints.FindAsync(id);
-                if (matchdp == null)
+                foreach (var id in ids)
                 {
-                    return Results.NotFound($"Match Data Point with ID {id} not found."); // Return a 404 Not Found response
+                    await dataPointService.DeleteMatchDataPointAsync(id);
                 }
-
-                // Delete the match data point
-                context.MatchDataPoints.Remove(matchdp);
+                return Results.NoContent();
             }
-
-            await context.SaveChangesAsync();
-
-            return Results.NoContent(); // Return success response
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("DeleteMatchDataPoints")
         .WithTags("3. MatchDataPoints", "DELETE Endpoints")

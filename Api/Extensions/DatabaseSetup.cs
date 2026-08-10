@@ -46,7 +46,9 @@ public static class DatabaseSetup
                 Console.WriteLine($"Failed to parse DATABASE_URL: {ex.Message}");
                 connectionString = null;
             }
-        } else {
+        }
+        else
+        {
             Console.WriteLine($"DATABASE_URL not set. Checking DefaultConnection in configuration.");
         }
 
@@ -67,6 +69,7 @@ public static class DatabaseSetup
 
     /// <summary>
     /// Apply migrations and create PL/pgSQL functions + triggers for Postgres.
+    /// Safe to call multiple times - checks if functions/triggers exist before creating.
     /// </summary>
     public static void InitializeDatabase(this WebApplication app)
     {
@@ -78,17 +81,32 @@ public static class DatabaseSetup
 
         if (dbContext.Database.IsRelational())
         {
-            // Create PL/pgSQL functions (must exist before triggers)
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsertFunction);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDeleteFunction);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsertFunction);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDeleteFunction);
+            try
+            {
+                // Create PL/pgSQL functions (using CREATE OR REPLACE for idempotency)
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsertFunction);
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDeleteFunction);
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsertFunction);
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDeleteFunction);
 
-            // Create triggers that call the functions
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsert);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDelete);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsert);
-            dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDelete);
+                // Create triggers (drop if exists first to avoid conflicts)
+                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_game_match_count_insert ON \"Match\" CASCADE;");
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsert);
+
+                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_game_match_count_delete ON \"Match\" CASCADE;");
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDelete);
+
+                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_match_player_count_insert ON \"MatchDataPoint\" CASCADE;");
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsert);
+
+                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_match_player_count_delete ON \"MatchDataPoint\" CASCADE;");
+                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDelete);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Error creating functions/triggers: {ex.Message}");
+                // Don't throw - continue if triggers already exist
+            }
         }
     }
 }

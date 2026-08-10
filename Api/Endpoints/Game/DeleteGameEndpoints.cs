@@ -1,21 +1,26 @@
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
 
 public static class DeleteGameEndpoints
 {
     public static void MapDeleteGameEndpoints(this WebApplication app)
     {
 
-        app.MapDelete("/game/{id}", async (int id, GameDBContext context) =>
+        app.MapDelete("/game/{id}", async (int id, IGameService gameService) =>
         {
-            var game = await context.Games.FindAsync(id);
-            if (game == null)
+            try
             {
-                return Results.NotFound($"Game with ID {id} not found.");
+                await gameService.DeleteGameAsync(id);
+                return Results.NoContent();
             }
-
-            context.Games.Remove(game);
-            await context.SaveChangesAsync();
-
-            return Results.NoContent();
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+            catch (ServiceException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("DeleteGame")
         .WithTags("1. Games", "DELETE Endpoints", "9. FrontEnd - Mockup")
@@ -30,29 +35,32 @@ public static class DeleteGameEndpoints
 
 
 
-        app.MapDelete("/games", async (GameDBContext context, params int[] gameIds) =>
+        app.MapDelete("/games", async (IGameService gameService, params int[] gameIds) =>
         {
-            // Check if gameIds is null or empty
-            if (gameIds == null || gameIds.Length == 0)
+            try
             {
-                return Results.BadRequest("No game IDs provided."); // Return a 400 Bad Request response
-            }
-
-            // Iterate through each gameId in the list and delete the corresponding game
-            foreach (var id in gameIds)
-            {
-                var game = await context.Games.FindAsync(id);
-                if (game == null)
+                // Check if gameIds is null or empty
+                if (gameIds == null || gameIds.Length == 0)
                 {
-                    return Results.NotFound($"Game with ID {id} not found. No games were deleted."); // Return a 404 Not Found response
+                    return Results.BadRequest(new { error = "No game IDs provided." });
                 }
 
-                context.Games.Remove(game);
+                // Iterate through each gameId and delete
+                foreach (var id in gameIds)
+                {
+                    await gameService.DeleteGameAsync(id);
+                }
+
+                return Results.NoContent();
             }
-
-            await context.SaveChangesAsync();
-
-            return Results.NoContent(); // Return success response
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+            catch (ServiceException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("DeleteMultipleGames")
         .WithTags("1. Games", "DELETE Endpoints")

@@ -5,7 +5,7 @@ namespace Api.Tests
 {
     public class GameGetTests :TestBase
     {
-        public GameGetTests(WebApplicationFactory<Program> factory) : base(factory)
+        public GameGetTests()
         {
         }
         
@@ -35,11 +35,12 @@ namespace Api.Tests
 
             // Read the response content as a string
             var jsonResponseString = await response.Content.ReadAsStringAsync();
+            var jsonResponse = Newtonsoft.Json.Linq.JObject.Parse(jsonResponseString);
             
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
-            // Assert that the response message is "Not found"
-            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponseString);
+            // Assert that the error message contains the expected text
+            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"].ToString());
         }
 
         [Fact]
@@ -65,7 +66,7 @@ namespace Api.Tests
         public async Task GetGamesByDescription_ReturnsGameIfExists()
         {
             string gameDescription = "cartas"; // Change to a valid game ID for your test
-            var response = await Client.GetAsync($"/games?descripiton={gameDescription}");
+            var response = await Client.GetAsync($"/games?description={gameDescription}");
             // Read the response content as a string
             var jsonResponseString = await response.Content.ReadAsStringAsync();
             // Parse the JSON response into a JObject
@@ -87,11 +88,12 @@ namespace Api.Tests
 
             // Read the response content as a string
             var jsonResponseString = await response.Content.ReadAsStringAsync();
+            var jsonResponse = Newtonsoft.Json.Linq.JObject.Parse(jsonResponseString);
             
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
-            // Assert that the response message is "Not found"
-            Assert.Contains($"No games found with provided params.", jsonResponseString);
+            // Assert that the error message contains the expected text
+            Assert.Contains($"No games found with provided params.", jsonResponse["error"].ToString());
         }
 
         [Fact]

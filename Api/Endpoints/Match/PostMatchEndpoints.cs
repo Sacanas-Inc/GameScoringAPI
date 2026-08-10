@@ -1,4 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
+using GameScoringAPI.Endpoints.Match;
 
 // Declared DTO here because I only intend on using it here.
 public class PostSingleMatchDto
@@ -14,34 +16,22 @@ public static class PostMatchEndpoints
 {
     public static void MapPostMatchEndpoints(this WebApplication app)
     {    
-        app.MapPost("/match", async (PostSingleMatchDto matchDto, GameDBContext context) =>
+        app.MapPost("/match", async (CreateMatchRequest request, IMatchService matchService) =>
         {
-            var gameExists = await context.Games.AnyAsync(g => g.Id == matchDto.GameId);
-            if (!gameExists)
-                return Results.NotFound($"Game with ID {matchDto.GameId} not found.");
-            
-            var match = new Match
+            try
             {
-                GameId = matchDto.GameId,
-                MatchDate = matchDto.MatchDate,
-                Notes = matchDto.Notes,
-                isFinished = matchDto.isFinished
-            };
-            context.Matches.Add(match);
-            await context.SaveChangesAsync();
-
-            var returnMatch = new MatchForMatchDto
+                var matchId = await matchService.CreateMatchAsync(request);
+                var match = await matchService.GetMatchByIdAsync(matchId);
+                return Results.Created($"/match/{matchId}", match);
+            }
+            catch (ValidationException ex)
             {
-                MatchId = match.Id,
-                GameId = match.GameId,
-                MatchDate = match.MatchDate,
-                Notes = match.Notes,
-                isFinished = match.isFinished,
-                MatchDataPoints = null,
-                MatchStats = null
-            };
-
-            return Results.Created($"/matches/{returnMatch.MatchId}", returnMatch);
+                return Results.BadRequest(new { errors = ex.Errors });
+            }
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("PostMatch")
         .WithTags("2. Matches", "POST Endpoints", "9. FrontEnd - Mockup")
@@ -51,3 +41,4 @@ public static class PostMatchEndpoints
     
     }
 }
+

@@ -8,14 +8,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: gamescoringapi_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.x" # Specify your .NET version here
+          dotnet-version: "10.x"
 
       - name: Restore dependencies
         run: dotnet restore
@@ -26,3 +41,5 @@ jobs:
       - name: Run tests
         run: dotnet test --no-restore --verbosity normal
         working-directory: Api.Tests
+        env:
+          DATABASE_URL: "Server=localhost;Port=5433;User Id=testuser;Password=testpassword;Database=gamescoringapi_test;SSL Mode=disable;"

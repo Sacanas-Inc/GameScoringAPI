@@ -1,24 +1,45 @@
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
+
 public static class DeleteMatchEndpoints
 {
     public static void MapDeleteMatchEndpoints(this WebApplication app)
-    {        
-        app.MapDelete("/match-and-data-points/{id}", async (int id, GameDBContext context) =>
+    {
+        app.MapDelete("/match/{id}", async (int id, IMatchService matchService) =>
         {
-            var match = await context.Matches.FindAsync(id);
-            if (match == null)
+            try
             {
-                return Results.NotFound($"Match with ID {id} not found.");
+                await matchService.DeleteMatchAsync(id);
+                return Results.NoContent();
             }
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+        })
+        .WithName("DeleteMatch")
+        .WithTags("2. Matches", "DELETE Endpoints")
+        .WithOpenApi()
+        .WithDescription("Deletes a match and all associated data points (via DB cascade) identified by the provided ID. Returns 204 No Content on success, 404 Not Found if the match does not exist.")
+        .Produces(StatusCodes.Status404NotFound, typeof(string), "application/json")
+        .Produces(StatusCodes.Status204NoContent, typeof(void), "application/json");
 
-            // Retrieve and delete all MatchDataPoint records with the specified MatchID
-            var dataPoints = context.MatchDataPoints.Where(dp => dp.MatchId == id);
-            context.MatchDataPoints.RemoveRange(dataPoints);
+        app.MapDelete("/match-and-data-points/{id}", async (int id, IMatchService matchService, IMatchDataPointService dataPointService) =>
+        {
+            try
+            {
+                // Delete all MatchDataPoints associated with this match
+                await dataPointService.DeleteAllDataPointsForMatchAsync(id);
 
-            // Delete the match
-            context.Matches.Remove(match);
-            await context.SaveChangesAsync();
+                // Delete the match
+                await matchService.DeleteMatchAsync(id);
 
-            return Results.NoContent();
+                return Results.NoContent();
+            }
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("DeleteMatchAndAllDataPoints")
         .WithTags("2. Matches", "DELETE Endpoints", "9. FrontEnd - Mockup")
