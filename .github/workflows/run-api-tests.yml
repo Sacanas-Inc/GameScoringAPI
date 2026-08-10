@@ -42,4 +42,4 @@ jobs:
         run: dotnet test --no-restore --verbosity normal
         working-directory: Api.Tests
         env:
-          DATABASE_URL: "Server=localhost;Port=5433;User Id=testuser;Password=testpassword;Database=gamescoringapi_test;SSL Mode=disable;"
+          ConnectionStrings__DatabaseUrl: "Server=localhost;Port=5433;User Id=testuser;Password=testpassword;Database=gamescoringapi_test;SSL Mode=disable;"
