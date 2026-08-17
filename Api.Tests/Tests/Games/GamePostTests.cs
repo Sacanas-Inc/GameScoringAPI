@@ -8,14 +8,14 @@ namespace Api.Tests
 {
     public class GamePostTests :TestBase
     {
-        public GamePostTests(WebApplicationFactory<Program> factory) : base(factory)
+        public GamePostTests()
         {
         }
 
         [Fact]
         public async Task CreateSingleGame_ReturnsCreated()
         {            
-            var result = await Client.PostAsJsonAsync("/game", new GameDto
+            var result = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = "UnitTestName",
                 GameDescription = "This is a test game description."
@@ -27,28 +27,28 @@ namespace Api.Tests
         public async Task CreateSingleGame_BadRequest_InvalidData()
         {
             // Test for invalid game Name.
-            var result = await Client.PostAsJsonAsync("/game", new GameDto
+            var result = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = ""
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
 
             // Test for invalid MinPlayers.
-            result = await Client.PostAsJsonAsync("/game", new GameDto
+            result = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = "TESTE", MinPlayers = -1
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
             
             // Test for invalid MaxPlayers.
-            result = await Client.PostAsJsonAsync("/game", new GameDto
+            result = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = "TESTE2", MinPlayers = -1
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
 
             // Test for invalid AverageDuration.
-            result = await Client.PostAsJsonAsync("/game", new GameDto
+            result = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = "TESTE2", AverageDuration = -1
             });
@@ -59,14 +59,13 @@ namespace Api.Tests
         public async Task CreateSingleGame_ReturnsCorrectData()
         {
             // Create the game DTO to send in the POST request
-            var gameToCreate = new GameDto
+            var gameToCreate = new CreateGameRequest
             {
                 GameName = "GameTest",
                 GameDescription = "This is a test game description.",
                 MinPlayers = 2,
                 MaxPlayers = 6,
-                AverageDuration = 90,
-                MatchesCount = 0
+                AverageDuration = 90
             };
 
             // Send the POST request
@@ -101,9 +100,11 @@ namespace Api.Tests
         [Fact]
         public async Task CreateMultipleGames_ReturnsCreated()
         {
-            var result = await Client.PostAsJsonAsync("/games", new List<GameDto>
+            var result = await Client.PostAsJsonAsync("/games", new List<CreateGameRequest>
             {
-                new GameDto { GameName = "Game 1" }, new GameDto { GameName = "Game 2" }, new GameDto { GameName = "Game 3" }
+                new CreateGameRequest { GameName = "Game 1" }, 
+                new CreateGameRequest { GameName = "Game 2" }, 
+                new CreateGameRequest { GameName = "Game 3" }
             });
             Assert.Equal(HttpStatusCode.Created, result.StatusCode);
         }
@@ -111,21 +112,27 @@ namespace Api.Tests
         [Fact]
         public async Task CreateMultipleGames_BadRequest_InvalidData()
         {           
-            var result = await Client.PostAsJsonAsync("/games", new List<GameDto>
+            var result = await Client.PostAsJsonAsync("/games", new List<CreateGameRequest>
             {
-                new GameDto { GameName = "Game 1" }, new GameDto { GameName = "" }, new GameDto { GameName = "Game 3" }
+                new CreateGameRequest { GameName = "Game 1" }, 
+                new CreateGameRequest { GameName = "" }, 
+                new CreateGameRequest { GameName = "Game 3" }
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
             
-            result = await Client.PostAsJsonAsync("/games", new List<GameDto>
+            result = await Client.PostAsJsonAsync("/games", new List<CreateGameRequest>
             {
-                new GameDto { GameName = "Game 1", MinPlayers = 0}, new GameDto { GameName = "Game 2",  MinPlayers = -1 }, new GameDto { GameName = "Game 3", MinPlayers = 5 }
+                new CreateGameRequest { GameName = "Game 1", MinPlayers = 0}, 
+                new CreateGameRequest { GameName = "Game 2",  MinPlayers = -1 }, 
+                new CreateGameRequest { GameName = "Game 3", MinPlayers = 5 }
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
 
-            result = await Client.PostAsJsonAsync("/games", new List<GameDto>
+            result = await Client.PostAsJsonAsync("/games", new List<CreateGameRequest>
             {
-                new GameDto { GameName = "Game 1"}, new GameDto { GameName = "Game 2",  AverageDuration = -1 }, new GameDto { GameName = "Game 3"}
+                new CreateGameRequest { GameName = "Game 1"}, 
+                new CreateGameRequest { GameName = "Game 2",  AverageDuration = -1 }, 
+                new CreateGameRequest { GameName = "Game 3"}
             });
             Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
         }
@@ -134,34 +141,31 @@ namespace Api.Tests
         public async Task CreateMultipleGames_ReturnsCorrectData()
         {
             // Create the list of game DTOs to send in the POST request
-            var gamesToCreate = new List<GameDto>
+            var gamesToCreate = new List<CreateGameRequest>
             {
-                new GameDto
+                new CreateGameRequest
                 {
                     GameName = "GameTest1",
                     GameDescription = "This is a test game description 1.",
                     MinPlayers = 2,
                     MaxPlayers = 6,
-                    AverageDuration = 90,
-                    MatchesCount = 0
+                    AverageDuration = 90
                 },
-                new GameDto
+                new CreateGameRequest
                 {
                     GameName = "GameTest2",
                     GameDescription = "This is a test game description 2.",
                     MinPlayers = 3,
                     MaxPlayers = 5,
-                    AverageDuration = 60,
-                    MatchesCount = 0
+                    AverageDuration = 60
                 },
-                new GameDto
+                new CreateGameRequest
                 {
                     GameName = "GameTest3",
                     GameDescription = "This is a test game description 3.",
                     MinPlayers = 1,
                     MaxPlayers = 4,
-                    AverageDuration = 30,
-                    MatchesCount = 0
+                    AverageDuration = 30
                 }
             };
 
@@ -183,20 +187,17 @@ namespace Api.Tests
 
             for (int i = 0; i < gamesToCreate.Count; i++)
             {
-                var expectedGame = gamesToCreate[i];
+                var sentGame = gamesToCreate[i];
                 var createdGame = createdGames[i];
 
-                // Update the expected game with the returned Id
-                expectedGame.Id = createdGame.Id;
-
-                // Assert that each created game matches the expected game
-                Assert.Equal(expectedGame.Id, createdGame.Id);
-                Assert.Equal(expectedGame.GameName, createdGame.GameName);
-                Assert.Equal(expectedGame.GameDescription, createdGame.GameDescription);
-                Assert.Equal(expectedGame.MinPlayers, createdGame.MinPlayers);
-                Assert.Equal(expectedGame.MaxPlayers, createdGame.MaxPlayers);
-                Assert.Equal(expectedGame.AverageDuration, createdGame.AverageDuration);
-                Assert.Equal(expectedGame.MatchesCount, createdGame.MatchesCount);
+                // Assert that each created game matches the sent game
+                Assert.NotEqual(0, createdGame.Id); // Assert ID was generated
+                Assert.Equal(sentGame.GameName, createdGame.GameName);
+                Assert.Equal(sentGame.GameDescription, createdGame.GameDescription);
+                Assert.Equal(sentGame.MinPlayers, createdGame.MinPlayers);
+                Assert.Equal(sentGame.MaxPlayers, createdGame.MaxPlayers);
+                Assert.Equal(sentGame.AverageDuration, createdGame.AverageDuration);
+                Assert.Equal(0, createdGame.MatchesCount); // New games should have 0 matches
             }
         
         }
@@ -205,7 +206,7 @@ namespace Api.Tests
         public async Task CreateSingleGame_ResponseHeadersContainExpectedValues()
         {
             // Act
-            var response = await Client.PostAsJsonAsync("/game", new GameDto
+            var response = await Client.PostAsJsonAsync("/game", new CreateGameRequest
             {
                 GameName = "UnitTestName"
             });
@@ -217,16 +218,15 @@ namespace Api.Tests
         public async Task CreateMultipleGames_ResponseHeadersContainExpectedValues()
         {
             // Create the list of game DTOs to send in the POST request
-            var gamesToCreate = new List<GameDto>
+            var gamesToCreate = new List<CreateGameRequest>
             {
-                new GameDto
+                new CreateGameRequest
                 {
                     GameName = "GameTest1",
                     GameDescription = "This is a test game description 1.",
                     MinPlayers = 2,
                     MaxPlayers = 6,
-                    AverageDuration = 90,
-                    MatchesCount = 0
+                    AverageDuration = 90
                 }
             };
 

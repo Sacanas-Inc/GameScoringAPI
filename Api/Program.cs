@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
+using GameScoringAPI.Extensions;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Validators;
+using GameScoringAPI.Mapper;
 
+// builder created using extension method
 var builder = WebApplication.CreateBuilder(args);
 
 
-
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Add swagger services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
     {
@@ -24,53 +27,23 @@ builder.Services.AddCors(options =>
     });
 
 
-//builder.Services.AddControllers()
-//    .AddJsonOptions(options =>
-//    {
-//        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
-//    });
+// Configure database services (DbContext) and connection.
+builder.ConfigureDatabaseServices();
 
-
-// Construct the database path
-var dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "games.db");
-
-builder.Services.AddDbContext<GameDBContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
-
-Console.WriteLine($"Checking Database Connection:");
-Console.WriteLine($"Database File Path: {dbPath}");
-Console.WriteLine($"Database File Exists: {File.Exists(dbPath)}");
+// Register application services
+builder.Services.AddScoped<IGameValidator, GameValidator>();
+builder.Services.AddScoped<IGameService, GameService>();
+builder.Services.AddScoped<IMatchValidator, MatchValidator>();
+builder.Services.AddScoped<IMatchService, MatchService>();
+builder.Services.AddScoped<IMatchDataPointValidator, MatchDataPointValidator>();
+builder.Services.AddScoped<IMatchDataPointService, MatchDataPointService>();
+builder.Services.AddScoped<MatchMapper>();
 
 
 var app = builder.Build();
 
-// Database stuff.
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<GameDBContext>();
-
-    // Delete the existing database
-    //dbContext.Database.EnsureDeleted();
-
-    // Create a new database based on the model definitions
-    if(!File.Exists(dbPath))
-        dbContext.Database.EnsureCreated();
-
-    //Run the migrtions, if any.
-    //dbContext.Database.Migrate();
-
-    // This is to make sure the database context supports raw SQL.
-    // Since we have unit tests setup, and we change the database to be in memory during the tests,
-    // rawsql cant be executed on them.
-    if (dbContext.Database.IsRelational())
-    {
-        // Execute the SQL to create triggers
-        dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsert);
-        dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDelete);
-        dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDelete);
-        dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsert);
-    }
-}
+// Database initialization (migrations, triggers)
+app.InitializeDatabase();
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>

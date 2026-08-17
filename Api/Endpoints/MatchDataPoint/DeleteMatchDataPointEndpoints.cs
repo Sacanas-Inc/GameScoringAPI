@@ -1,18 +1,23 @@
+using GameScoringAPI.Endpoints.MatchDataPoint;
+using GameScoringAPI.Services;
+using GameScoringAPI.Services.Exceptions;
+using Microsoft.AspNetCore.Mvc;
+
 public static class DeleteMatchDataPointEndpoints
 {
     public static void MapDeleteMatchDataPointEndpoints(this WebApplication app)
     {
-        app.MapDelete("/match-data-point/{id}", async (int id, GameDBContext context) =>
+        app.MapDelete("/match-data-point/{id}", async (int id, IMatchDataPointService dataPointService) =>
         {
-            var matchdp = await context.MatchDataPoints.FindAsync(id);
-            if (matchdp == null)
-                return Results.NotFound($"Match Data Point with ID {id} not found.");
-
-            // Delete the match
-            context.MatchDataPoints.Remove(matchdp);
-            await context.SaveChangesAsync();
-
-            return Results.NoContent();
+            try
+            {
+                await dataPointService.DeleteMatchDataPointAsync(id);
+                return Results.NoContent();
+            }
+            catch (NotFoundException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
         })
         .WithName("DeleteMatchDataPoint")
         .WithTags("3. MatchDataPoints", "DELETE Endpoints")
@@ -26,38 +31,34 @@ public static class DeleteMatchDataPointEndpoints
 
 
 
-        app.MapDelete("/match-data-points", async (GameDBContext context, params int[] ids) =>
+        app.MapDelete("/match-data-points", async ([FromBody] DeleteMatchDataPointsRequest request, IMatchDataPointService dataPointService) =>
         {
-            if (ids == null || ids.Length == 0)
+            if (request.Ids == null || request.Ids.Count == 0)
             {
-                return Results.BadRequest("No Match Data Point IDs provided."); // Return a 400 Bad Request response
+                return Results.BadRequest(new { error = "No Match Data Point IDs provided." });
             }
 
-            foreach (var id in ids)
-            {
-                var matchdp = await context.MatchDataPoints.FindAsync(id);
-                if (matchdp == null)
-                {
-                    return Results.NotFound($"Match Data Point with ID {id} not found."); // Return a 404 Not Found response
-                }
+            var results = (await dataPointService.DeleteMultipleMatchDataPointsAsync(request.Ids)).ToList();
 
-                // Delete the match data point
-                context.MatchDataPoints.Remove(matchdp);
+            if (results.Any(r => !r.Deleted))
+            {
+                return Results.Json(results, statusCode: StatusCodes.Status207MultiStatus);
             }
 
-            await context.SaveChangesAsync();
-
-            return Results.NoContent(); // Return success response
+            return Results.NoContent();
         })
         .WithName("DeleteMatchDataPoints")
         .WithTags("3. MatchDataPoints", "DELETE Endpoints")
         .WithOpenApi()
         .WithDescription
         (
-            "Deletes multiple match data points from the database identified by the provided IDs. Returns 400 Bad Request if no match data point IDs are provided. Returns 404 Not Found if any of the specified IDs are not found. Upon successful deletion, returns 204 No Content."
+            "Deletes multiple match data points identified by the provided IDs in a single transaction. " +
+            "Returns 400 Bad Request if no IDs are provided. " +
+            "Returns 204 No Content if all IDs were deleted successfully. " +
+            "Returns 207 Multi-Status with a per-ID result list if any IDs were not found."
         )
         .Produces(StatusCodes.Status400BadRequest, typeof(void), "application/json")
-        .Produces(StatusCodes.Status404NotFound, typeof(string), "application/json")
-        .Produces(StatusCodes.Status204NoContent, typeof(void), "application/json");
+        .Produces(StatusCodes.Status204NoContent, typeof(void), "application/json")
+        .Produces(StatusCodes.Status207MultiStatus, typeof(IEnumerable<DeleteMatchDataPointResult>), "application/json");
     }
 }

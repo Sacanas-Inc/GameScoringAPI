@@ -37,3 +37,27 @@ public class GameWithMatchDataPointDto
     public int MatchesCount { get; set; }
     public List<MatchForGameDto> Matches { get; set; } = new List<MatchForGameDto>();
 }
+
+/// <summary>
+/// Request DTO for creating a new game.
+/// </summary>
+public class CreateGameRequest
+{
+    public string GameName { get; set; }
+    public string GameDescription { get; set; }
+    public int MinPlayers { get; set; }
+    public int MaxPlayers { get; set; }
+    public int AverageDuration { get; set; }
+}
+
+/// <summary>
+/// Request DTO for updating an existing game.
+/// </summary>
+public class UpdateGameRequest
+{
+    public string GameName { get; set; }
+    public string GameDescription { get; set; }
+    public int MinPlayers { get; set; }
+    public int MaxPlayers { get; set; }
+    public int AverageDuration { get; set; }
+}

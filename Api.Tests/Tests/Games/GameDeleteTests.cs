@@ -5,7 +5,7 @@ namespace Api.Tests
 {
     public class GameDeleteTests :TestBase
     {
-        public GameDeleteTests(WebApplicationFactory<Program> factory) : base(factory)
+        public GameDeleteTests()
         {
         }
         
@@ -17,13 +17,14 @@ namespace Api.Tests
             var responseGet = await Client.GetAsync($"/game/{gameId}");
             // Read the response content as a string
             var jsonResponseString = await responseGet.Content.ReadAsStringAsync();
+            var jsonResponse = Newtonsoft.Json.Linq.JObject.Parse(jsonResponseString);
 
             // Assert
             Assert.Equal(System.Net.HttpStatusCode.NoContent, responseDel.StatusCode);
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, responseGet.StatusCode);
-            // Assert that the response message is "Not found"
-            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponseString);
+            // Assert that the error message contains the expected text
+            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"].ToString());
         }
 
     }
