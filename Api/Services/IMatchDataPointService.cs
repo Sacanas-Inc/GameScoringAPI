@@ -53,4 +53,10 @@ public interface IMatchDataPointService
     /// Deletes all data points for a specific match.
     /// </summary>
     Task DeleteAllDataPointsForMatchAsync(int matchId);
+
+    /// <summary>
+    /// Deletes multiple match data points by ID in a single transaction.
+    /// Returns a result per ID indicating success or not-found.
+    /// </summary>
+    Task<IEnumerable<DeleteMatchDataPointResult>> DeleteMultipleMatchDataPointsAsync(List<int> ids);
 }

@@ -241,5 +241,115 @@ namespace Api.Tests
             Assert.True(playerCountAfter < playerCountBefore,
                 "Deleting all data points for players should decrease player count");
         }
+
+        // ── Bulk delete (DELETE /match-data-points) ──────────────────────────
+
+        private async Task<int> CreateDataPointForMatchAsync(int matchId)
+        {
+            var request = new
+            {
+                playerName = $"Player-{Guid.NewGuid().ToString()[..8]}",
+                gamePoints = 10,
+                pointsDescription = "Bulk delete test point"
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
+            var response = await Client.PostAsync($"/match-data-point/{matchId}", content);
+
+            if (response.StatusCode != System.Net.HttpStatusCode.Created)
+                return -1;
+
+            var created = JsonConvert.DeserializeObject<dynamic>(await response.Content.ReadAsStringAsync());
+            int id = created?.id ?? created?.Id ?? -1;
+
+            if (id == -1)
+            {
+                var location = response.Headers.Location?.ToString() ?? "";
+                var m = System.Text.RegularExpressions.Regex.Match(location, @"/(\d+)$");
+                if (m.Success && int.TryParse(m.Groups[1].Value, out var parsed))
+                    id = parsed;
+            }
+
+            return id;
+        }
+
+        private async Task<int> GetFirstMatchIdAsync()
+        {
+            var response = await Client.GetAsync("/matches");
+            if (!response.IsSuccessStatusCode) return -1;
+            var matches = JsonConvert.DeserializeObject<List<MatchForMatchDto>>(await response.Content.ReadAsStringAsync());
+            return matches?.FirstOrDefault()?.MatchId ?? -1;
+        }
+
+        [Fact]
+        public async Task BulkDelete_AllValidIds_ReturnsNoContent()
+        {
+            var matchId = await GetFirstMatchIdAsync();
+            if (matchId == -1) return;
+
+            var id1 = await CreateDataPointForMatchAsync(matchId);
+            var id2 = await CreateDataPointForMatchAsync(matchId);
+            if (id1 == -1 || id2 == -1) return;
+
+            var body = new StringContent(
+                JsonConvert.SerializeObject(new { ids = new[] { id1, id2 } }),
+                Encoding.UTF8, "application/json");
+
+            var response = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/match-data-points") { Content = body });
+
+            Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task BulkDelete_MixValidAndInvalidIds_ReturnsMultiStatus()
+        {
+            var matchId = await GetFirstMatchIdAsync();
+            if (matchId == -1) return;
+
+            var validId = await CreateDataPointForMatchAsync(matchId);
+            if (validId == -1) return;
+            var invalidId = -999;
+
+            var body = new StringContent(
+                JsonConvert.SerializeObject(new { ids = new[] { validId, invalidId } }),
+                Encoding.UTF8, "application/json");
+
+            var response = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/match-data-points") { Content = body });
+
+            Assert.Equal(207, (int)response.StatusCode);
+
+            var results = JsonConvert.DeserializeObject<List<dynamic>>(await response.Content.ReadAsStringAsync());
+            Assert.NotNull(results);
+            Assert.Contains(results, r => (int)r.id == validId && (bool)r.deleted == true);
+            Assert.Contains(results, r => (int)r.id == invalidId && (bool)r.deleted == false);
+        }
+
+        [Fact]
+        public async Task BulkDelete_AllInvalidIds_ReturnsMultiStatusAllFailed()
+        {
+            var body = new StringContent(
+                JsonConvert.SerializeObject(new { ids = new[] { -1, -2, -3 } }),
+                Encoding.UTF8, "application/json");
+
+            var response = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/match-data-points") { Content = body });
+
+            Assert.Equal(207, (int)response.StatusCode);
+
+            var results = JsonConvert.DeserializeObject<List<dynamic>>(await response.Content.ReadAsStringAsync());
+            Assert.NotNull(results);
+            Assert.All(results, r => Assert.False((bool)r.deleted));
+        }
+
+        [Fact]
+        public async Task BulkDelete_EmptyIds_ReturnsBadRequest()
+        {
+            var body = new StringContent(
+                JsonConvert.SerializeObject(new { ids = Array.Empty<int>() }),
+                Encoding.UTF8, "application/json");
+
+            var response = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/match-data-points") { Content = body });
+
+            Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        }
     }
 }

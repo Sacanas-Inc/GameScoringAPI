@@ -15,3 +15,15 @@ public class UpdateMatchDataPointRequest
     public int? GamePoints { get; set; }
     public string? PointsDescription { get; set; }
 }
+
+public class DeleteMatchDataPointsRequest
+{
+    public List<int> Ids { get; set; } = [];
+}
+
+public class DeleteMatchDataPointResult
+{
+    public int Id { get; set; }
+    public bool Deleted { get; set; }
+    public string? Error { get; set; }
+}

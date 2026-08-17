@@ -167,6 +167,34 @@ public class MatchDataPointService : IMatchDataPointService
         _logger.LogInformation("Match data point {DataPointId} deleted successfully", id);
     }
 
+    public async Task<IEnumerable<DeleteMatchDataPointResult>> DeleteMultipleMatchDataPointsAsync(List<int> ids)
+    {
+        _logger.LogInformation("Bulk deleting {Count} match data points", ids.Count);
+
+        var foundDataPoints = await _context.MatchDataPoints
+            .Where(dp => ids.Contains(dp.Id))
+            .ToListAsync();
+
+        var foundIds = foundDataPoints.Select(dp => dp.Id).ToHashSet();
+        var notFoundIds = ids.Except(foundIds);
+
+        _context.MatchDataPoints.RemoveRange(foundDataPoints);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Bulk deleted {Count} match data points", foundDataPoints.Count);
+
+        var results = foundIds
+            .Select(id => new DeleteMatchDataPointResult { Id = id, Deleted = true })
+            .Concat(notFoundIds.Select(id => new DeleteMatchDataPointResult
+            {
+                Id = id,
+                Deleted = false,
+                Error = $"Match data point {id} not found"
+            }));
+
+        return results;
+    }
+
     public async Task DeleteAllDataPointsForMatchAsync(int matchId)
     {
         _logger.LogInformation("Deleting all data points for match {MatchId}", matchId);

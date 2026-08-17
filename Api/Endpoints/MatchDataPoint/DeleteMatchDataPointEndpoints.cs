@@ -1,5 +1,7 @@
+using GameScoringAPI.Endpoints.MatchDataPoint;
 using GameScoringAPI.Services;
 using GameScoringAPI.Services.Exceptions;
+using Microsoft.AspNetCore.Mvc;
 
 public static class DeleteMatchDataPointEndpoints
 {
@@ -29,35 +31,34 @@ public static class DeleteMatchDataPointEndpoints
 
 
 
-        app.MapDelete("/match-data-points", async (IMatchDataPointService dataPointService, params int[] ids) =>
+        app.MapDelete("/match-data-points", async ([FromBody] DeleteMatchDataPointsRequest request, IMatchDataPointService dataPointService) =>
         {
-            if (ids == null || ids.Length == 0)
+            if (request.Ids == null || request.Ids.Count == 0)
             {
-                return Results.BadRequest("No Match Data Point IDs provided.");
+                return Results.BadRequest(new { error = "No Match Data Point IDs provided." });
             }
 
-            try
+            var results = (await dataPointService.DeleteMultipleMatchDataPointsAsync(request.Ids)).ToList();
+
+            if (results.Any(r => !r.Deleted))
             {
-                foreach (var id in ids)
-                {
-                    await dataPointService.DeleteMatchDataPointAsync(id);
-                }
-                return Results.NoContent();
+                return Results.Json(results, statusCode: StatusCodes.Status207MultiStatus);
             }
-            catch (NotFoundException ex)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
+
+            return Results.NoContent();
         })
         .WithName("DeleteMatchDataPoints")
         .WithTags("3. MatchDataPoints", "DELETE Endpoints")
         .WithOpenApi()
         .WithDescription
         (
-            "Deletes multiple match data points from the database identified by the provided IDs. Returns 400 Bad Request if no match data point IDs are provided. Returns 404 Not Found if any of the specified IDs are not found. Upon successful deletion, returns 204 No Content."
+            "Deletes multiple match data points identified by the provided IDs in a single transaction. " +
+            "Returns 400 Bad Request if no IDs are provided. " +
+            "Returns 204 No Content if all IDs were deleted successfully. " +
+            "Returns 207 Multi-Status with a per-ID result list if any IDs were not found."
         )
         .Produces(StatusCodes.Status400BadRequest, typeof(void), "application/json")
-        .Produces(StatusCodes.Status404NotFound, typeof(string), "application/json")
-        .Produces(StatusCodes.Status204NoContent, typeof(void), "application/json");
+        .Produces(StatusCodes.Status204NoContent, typeof(void), "application/json")
+        .Produces(StatusCodes.Status207MultiStatus, typeof(IEnumerable<DeleteMatchDataPointResult>), "application/json");
     }
 }
