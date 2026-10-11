@@ -20,7 +20,7 @@ public class MatchForGameDto
 public class MatchStatsDto
 {
     public int TotalGamePoints { get; set; }
-    public string WinningPlayer { get; set; }
+    public string? WinningPlayer { get; set; }
     public Dictionary<string, int> PlayerPoints { get; set; } = new Dictionary<string, int>();
 }
 

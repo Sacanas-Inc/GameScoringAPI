@@ -1,0 +1,17 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      Prevent warning regressions after the cleanup tracked in issue #30.
+      Any new compiler/analyzer warning should fail the build.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!--
+      Keep NuGet audit findings visible without blocking the build
+      (e.g. advisories on transitive packages). See issue #30, Step 8.
+    -->
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
+</Project>

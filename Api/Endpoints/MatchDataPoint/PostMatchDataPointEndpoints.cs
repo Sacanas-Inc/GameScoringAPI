@@ -6,9 +6,9 @@ public class ReturnPostMatchDataPointDto
 {
     public int id { get; set; }
     public int MatchId { get; set; }
-    public string PlayerName { get; set; }
+    public string PlayerName { get; set; } = null!;
     public int GamePoints { get; set; }
-    public string PointsDescription { get; set; }
+    public string PointsDescription { get; set; } = null!;
     public DateTime CreatedDate { get; set; }
 }
 

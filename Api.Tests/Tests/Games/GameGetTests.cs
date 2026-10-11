@@ -40,7 +40,7 @@ namespace Api.Tests
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
             // Assert that the error message contains the expected text
-            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"].ToString());
+            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"]!.ToString());
         }
 
         [Fact]
@@ -55,7 +55,7 @@ namespace Api.Tests
 
             // Asserts
             Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
-            Assert.Single(gottenGames);
+            Assert.Single(gottenGames!);
             if(gottenGames is not null)
                 foreach(GameDto game in gottenGames)
                     Assert.Equal(requestedGameId, game.Id);
@@ -74,7 +74,7 @@ namespace Api.Tests
 
             // Asserts
             Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
-            Assert.NotEmpty(gottenGames);
+            Assert.NotEmpty(gottenGames!);
             if(gottenGames is not null)
                 foreach(GameDto game in gottenGames)
                     Assert.Contains(gameDescription, game.GameDescription);
@@ -93,7 +93,7 @@ namespace Api.Tests
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
             // Assert that the error message contains the expected text
-            Assert.Contains($"No games found with provided params.", jsonResponse["error"].ToString());
+            Assert.Contains($"No games found with provided params.", jsonResponse["error"]!.ToString());
         }
 
         [Fact]

@@ -24,7 +24,7 @@ namespace Api.Tests
             // Assert that the status code is 404 Not Found
             Assert.Equal(System.Net.HttpStatusCode.NotFound, responseGet.StatusCode);
             // Assert that the error message contains the expected text
-            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"].ToString());
+            Assert.Contains($"Game with ID {gameId.ToString()} not found.", jsonResponse["error"]!.ToString());
         }
 
     }

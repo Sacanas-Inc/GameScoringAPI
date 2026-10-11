@@ -310,6 +310,7 @@ public class MatchDataPointServiceTests
 
         // Assert
         var updated = await context.MatchDataPoints.FindAsync(1);
+        Assert.NotNull(updated);
         Assert.Equal("Updated Player", updated.PlayerName);
         Assert.Equal(20, updated.GamePoints);
     }

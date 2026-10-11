@@ -15,6 +15,7 @@ public static class GetMatchDataPointEndpoints
             }
             catch (Exception ex)
             {
+                app.Logger.LogError(ex, "Failed to retrieve detailed match data points.");
                 return Results.InternalServerError();
             }
         })
@@ -32,6 +33,7 @@ public static class GetMatchDataPointEndpoints
             }
             catch (Exception ex)
             {
+                app.Logger.LogError(ex, "Failed to retrieve match data points.");
                 return Results.InternalServerError();
             }
         })
@@ -64,6 +66,7 @@ public static class GetMatchDataPointEndpoints
             }
             catch (Exception ex)
             {
+                app.Logger.LogError(ex, "Failed to retrieve data points for match {MatchId}.", matchId);
                 return Results.InternalServerError();
             }
         })

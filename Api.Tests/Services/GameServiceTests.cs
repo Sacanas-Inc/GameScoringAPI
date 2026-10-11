@@ -321,6 +321,7 @@ public class GameServiceTests
 
         // Assert
         var updated = await context.Games.FindAsync(game.Id);
+        Assert.NotNull(updated);
         Assert.Equal("Updated", updated.GameDescription);
     }
 

@@ -130,13 +130,13 @@ namespace Api.Tests
         public int MatchId { get; set; }
 
         [JsonProperty("playerName")]
-        public string PlayerName { get; set; }
+        public string PlayerName { get; set; } = null!;
 
         [JsonProperty("gamePoints")]
         public int GamePoints { get; set; }
 
         [JsonProperty("pointsDescription")]
-        public string PointsDescription { get; set; }
+        public string PointsDescription { get; set; } = null!;
 
         [JsonProperty("createdDate")]
         public DateTime CreatedDate { get; set; }

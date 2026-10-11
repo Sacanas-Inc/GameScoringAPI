@@ -103,7 +103,7 @@ namespace Api.Tests
         public List<T> GetDto<T>(string name)
         {
             var jsonDto = File.ReadAllText($"./Data/{name}.json");
-            return JsonSerializer.Deserialize<List<T>>(jsonDto, GetOptions());
+            return JsonSerializer.Deserialize<List<T>>(jsonDto, GetOptions())!;
         }
 
         protected void SeedGamesData(GameDBContext context)

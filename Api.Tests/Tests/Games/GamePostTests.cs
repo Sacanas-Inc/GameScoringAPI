@@ -73,7 +73,7 @@ namespace Api.Tests
 
             // Read and deserialize the response content
             var jsonResponseString = await result.Content.ReadAsStringAsync();
-            var createdGame = Newtonsoft.Json.JsonConvert.DeserializeObject<GameDto>(jsonResponseString);
+            var createdGame = Newtonsoft.Json.JsonConvert.DeserializeObject<GameDto>(jsonResponseString)!;
 
             // Create the expected game DTO with the expected Id
             var expectedGame = new GameDto
@@ -180,7 +180,7 @@ namespace Api.Tests
             Console.WriteLine("Response JSON: " + jsonResponseString);
 
             // Deserialize the response content
-            var createdGames = JsonConvert.DeserializeObject<List<GameDto>>(jsonResponseString);
+            var createdGames = JsonConvert.DeserializeObject<List<GameDto>>(jsonResponseString)!;
 
             // Assert that the number of created games matches the number of games sent
             Assert.Equal(gamesToCreate.Count, createdGames.Count);

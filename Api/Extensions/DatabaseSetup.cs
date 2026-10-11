@@ -54,8 +54,7 @@ public static class DatabaseSetup
                     Username = user,
                     Password = pass,
                     Database = uri.AbsolutePath.TrimStart('/'),
-                    SslMode = Npgsql.SslMode.Require,
-                    TrustServerCertificate = true
+                    SslMode = Npgsql.SslMode.Require
                 };
 
                 var connectionString = csBuilder.ToString();

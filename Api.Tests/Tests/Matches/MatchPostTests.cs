@@ -15,7 +15,7 @@ namespace Api.Tests
 
             if (games == null || games.Count == 0)
             {
-                Assert.True(false, "No games in database to test match creation");
+                Assert.Fail("No games in database to test match creation");
                 return;
             }
 
@@ -89,7 +89,7 @@ namespace Api.Tests
             {
                 gameId = gameId,
                 matchDate = DateTime.UtcNow,
-                notes = (string)null,
+                notes = (string?)null,
                 isFinished = true
             };
 

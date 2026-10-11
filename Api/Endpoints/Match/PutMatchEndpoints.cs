@@ -6,7 +6,7 @@ public class PutSingleMatchDto
 {
     public int GameId { get; set; }
     public DateTime MatchDate { get; set; }
-    public string Notes { get; set; }
+    public string? Notes { get; set; }
     public bool isFinished { get; set; }
 }
 
