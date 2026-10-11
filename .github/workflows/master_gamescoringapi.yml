@@ -22,6 +22,34 @@ jobs:
       - name: Build API
         run: dotnet build ./api/GameScoringAPI.csproj --configuration Release
 
+      - name: Generate appsettings.Production.json from secrets
+        shell: pwsh
+        run: |
+          # The base api/appsettings.json is gitignored and never reaches the runner,
+          # so this generates a COMPLETE production config: non-secret settings
+          # (logging, host, database options) plus the connection string secret.
+          $json = @{
+            Logging = @{
+              LogLevel = @{
+                Default = "Information"
+                "Microsoft.AspNetCore" = "Warning"
+                "Microsoft.EntityFrameworkCore.Database.Command" = "Warning"
+                "Microsoft.EntityFrameworkCore.Migrations" = "Information"
+              }
+            }
+            AllowedHosts = "*"
+            Database = @{
+              # false = keep serving in degraded mode and report via GET /health
+              FailFastOnStartup = $false
+            }
+            ConnectionStrings = @{
+              DatabaseUrl = "${{ secrets.DATABASE_URL }}"
+            }
+          } | ConvertTo-Json -Depth 5
+          $path = Join-Path "${{ github.workspace }}" "api/appsettings.Production.json"
+          [System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding($false)))
+          Write-Host "Wrote $path ($($json.Length) chars)"
+
       - name: Publish API
         run: dotnet publish ./api/GameScoringAPI.csproj --configuration Release --output "${{ github.workspace }}/myapp"
 

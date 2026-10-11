@@ -107,6 +107,7 @@ Icon
 # For WebAPI Projects
 appsettings.json
 appsettings.Development.json
+appsettings.Production.json
 
 # If using VS Code for development
 .vscode/
