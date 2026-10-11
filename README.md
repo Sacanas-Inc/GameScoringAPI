@@ -19,7 +19,29 @@ Minimal game scoring API. Store games, matches, match data points, compute simpl
 
 ### Prerequisites
 - .NET 10 SDK
-- Postgres 12+ (local or remote)
+- Postgres 12+ (local or remote), **or** Docker for the one-line local database below
+
+### Local Dev with Docker
+
+The committed `docker-compose.yml` starts a local PostgreSQL 16 on **localhost:5432**
+(distinct from the integration-test database on 5433) with a named volume and a
+healthcheck — no manually-installed Postgres required:
+
+```bash
+docker-compose up -d
+dotnet run --project Api
+```
+
+- The container uses **`postgres` / `postgres`** and database **`gamescoringdb`**, matching
+  the `DefaultConnection` example in [Setup](#setup).
+- Migrations and PL/pgSQL triggers initialize automatically on startup.
+- Stop it with `docker-compose down` (data is kept in the `dev-db-volume` volume); use
+  `docker-compose down -v` to also delete the data.
+- **Connection precedence:** `ConnectionStrings:DatabaseUrl` (or the env var
+  `ConnectionStrings__DatabaseUrl`) takes precedence over `DefaultConnection`. If a
+  `DatabaseUrl` is set — e.g. in a local, gitignored `Api/appsettings.Development.json` —
+  the app connects there instead of the container, so remove/override it to use the local
+  database.
 
 ### Setup
 
