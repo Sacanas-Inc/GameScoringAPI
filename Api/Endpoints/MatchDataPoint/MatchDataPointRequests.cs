@@ -3,9 +3,9 @@ namespace GameScoringAPI.Endpoints.MatchDataPoint;
 public class CreateMatchDataPointRequest
 {
     public int MatchId { get; set; }
-    public string PlayerName { get; set; }
+    public string PlayerName { get; set; } = null!;
     public int GamePoints { get; set; }
-    public string PointsDescription { get; set; }
+    public string PointsDescription { get; set; } = null!;
 }
 
 public class UpdateMatchDataPointRequest

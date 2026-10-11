@@ -17,7 +17,7 @@ public class MatchMapper
     /// <param name="match">The IQueryable<Match> of the database model, to be selected into thhe DTO.</param>
     /// <param name="includeDataPoints"> If we shouuld include the child objects includeDataPoints when doing the Select.</param>
     /// <returns></returns>
-    public IQueryable<MatchForMatchDto> SelectAndMapToDTO(IQueryable<Match>? match, bool? includeDataPoints)
+    public IQueryable<MatchForMatchDto> SelectAndMapToDTO(IQueryable<Match> match, bool? includeDataPoints)
     {   
           return match
                 .Select(m => new MatchForMatchDto

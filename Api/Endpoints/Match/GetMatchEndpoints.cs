@@ -11,17 +11,17 @@ public class MatchForMatchDto
     public string? Notes { get; set; }
     public int PlayerCount { get; set; }
     public bool isFinished { get; set; }
-    public List<MatchDataPointForMatchDto>? MatchDataPoints { get; set; } = new List<MatchDataPointForMatchDto>();
-    public MatchStatsDto? MatchStats { get; set; } = new MatchStatsDto();
+    public List<MatchDataPointForMatchDto> MatchDataPoints { get; set; } = new List<MatchDataPointForMatchDto>();
+    public MatchStatsDto MatchStats { get; set; } = new MatchStatsDto();
 
 }
 
 public class MatchDataPointForMatchDto
 {
     public int Id { get; set; }
-    public string PlayerName { get; set; }
+    public string PlayerName { get; set; } = null!;
     public int GamePoints { get; set; }
-    public string PointsDescription { get; set; }
+    public string PointsDescription { get; set; } = null!;
     public DateTime CreatedDate { get; set; }
 }
 

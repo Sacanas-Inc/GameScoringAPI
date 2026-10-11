@@ -114,7 +114,7 @@ namespace Api.Tests
             Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
             var jsonResponseString = await response.Content.ReadAsStringAsync();
             var jsonResponse = Newtonsoft.Json.Linq.JObject.Parse(jsonResponseString);
-            Assert.Contains("not found", jsonResponse["error"].ToString(), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("not found", jsonResponse["error"]!.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

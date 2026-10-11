@@ -13,7 +13,7 @@ public class Match
     public bool isFinished { get; set; }
     public int PlayerCount { get; set; }
     // Navigation property for related Game
-    public Game Game { get; set; }
+    public Game Game { get; set; } = null!;
 
     // Navigation property for related MatchDataPoints
     public List<MatchDataPoint> MatchDataPoints { get; set; } = new();

@@ -130,7 +130,7 @@ namespace Api.Tests
             {
                 gameId = matchToUpdate.GameId,
                 matchDate = matchToUpdate.MatchDate,
-                notes = (string)null, // Clear notes
+                notes = (string?)null, // Clear notes
                 isFinished = matchToUpdate.isFinished
             };
 

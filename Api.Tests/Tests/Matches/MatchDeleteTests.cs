@@ -16,7 +16,7 @@ namespace Api.Tests
 
             if (games == null || games.Count == 0)
             {
-                Assert.True(false, "No games in database to test match deletion");
+                Assert.Fail("No games in database to test match deletion");
                 return;
             }
 

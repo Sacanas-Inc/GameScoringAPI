@@ -20,7 +20,7 @@ namespace Api.Tests
                 new StringContent(JsonConvert.SerializeObject(matchRequest), Encoding.UTF8, "application/json"));
             Assert.Equal(System.Net.HttpStatusCode.Created, matchResponse.StatusCode);
             var createdMatch = JsonConvert.DeserializeObject<dynamic>(await matchResponse.Content.ReadAsStringAsync());
-            var matchId = (int)createdMatch.matchId;
+            var matchId = (int)createdMatch!.matchId;
 
             var dataPointRequest = new
             {

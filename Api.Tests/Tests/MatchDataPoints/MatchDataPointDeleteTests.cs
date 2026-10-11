@@ -34,7 +34,7 @@ namespace Api.Tests
             Assert.Equal(System.Net.HttpStatusCode.Created, matchCreateResponse.StatusCode);
             var createdMatch = JsonConvert.DeserializeObject<dynamic>(
                 await matchCreateResponse.Content.ReadAsStringAsync());
-            var matchId = (int)createdMatch.matchId;
+            var matchId = (int)createdMatch!.matchId;
             var dataPointRequest = new
             {
                 matchId = matchId,
@@ -131,7 +131,7 @@ namespace Api.Tests
             // Get data point ID from response
             var createdDataPoint = JsonConvert.DeserializeObject<dynamic>(
                 await createResponse.Content.ReadAsStringAsync());
-            int dataPointId = createdDataPoint.id ?? createdDataPoint.Id ?? -1;
+            int dataPointId = createdDataPoint!.id ?? createdDataPoint.Id ?? -1;
 
             if (dataPointId == -1)
             {
