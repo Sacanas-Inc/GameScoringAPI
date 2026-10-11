@@ -1,414 +1,271 @@
 # Testing Guide
 
-This document explains how to run tests for the GameScoringAPI project.
+How to run and understand the tests for GameScoringAPI.
 
 ## Overview
 
-The test suite is split into two categories:
+The suite has **106 tests** split into two categories:
 
-- **Unit Tests (Service Layer):** Fast, isolated tests using in-memory database. Test service logic without database dependencies.
-- **Integration Tests (Endpoint Layer):** Real PostgreSQL database via Docker. Validate actual API behavior including database triggers.
+| Category | Count | Needs Docker? | Location |
+| --- | ---: | :---: | --- |
+| **Unit** — service/business logic on EF Core InMemory | 48 | No | `Api.Tests/Services/`, `Api.Tests/Extensions/` |
+| **Integration** — real endpoints against PostgreSQL | 58 | Yes | `Api.Tests/Tests/` |
 
-## Unit Tests (Service Layer)
+Unit tests are fast and isolated (each gets its own in-memory database).
+Integration tests validate real HTTP behavior **including the PL/pgSQL trigger
+side effects** that InMemory cannot exercise (e.g. `Games.MatchesCount`,
+`Matches.PlayerCount`).
 
-Unit tests use EF Core's InMemory provider for fast, isolated testing of service business logic.
+Run everything from the repository root.
 
-### Run All Unit Tests
+## Unit tests (no Docker)
+
+Unit tests use EF Core's InMemory provider and run in about a second.
+
+### Run all unit tests
+
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
 ```
 
-### Run Specific Service Tests
+> The three terms are needed because they live in different classes. The older,
+> shorter `--filter "ServiceTests"` runs only the three `*ServiceTests` classes
+> (41 tests) and misses the `Extensions` unit tests.
+
+### Run a specific class
+
 ```bash
 dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests"
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests"
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchDataPointServiceTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "DatabaseConnectionInfoTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "DatabaseInitializationStateTests"
 ```
 
-### Run with Verbose Output
+### Run a specific method
+
+```bash
+dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.GetGameByIdAsync_WithExistingId_ReturnsGame"
+```
+
+### Verbose output
+
 ```bash
 dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests" -v detailed
 ```
 
-**Characteristics:**
-- Fast execution (< 1 second)
-- No external dependencies
-- Each test gets a unique in-memory database
-- Tests service logic isolation, not trigger behavior
+**Characteristics:** fast (< 1s), no external dependencies, unique in-memory
+database per test, mocks validators where useful (Moq). They assert service
+logic only — **not** trigger behavior.
 
-### Service Test Coverage
+### Unit test coverage
 
-**GameServiceTests (15 tests)**
-- CRUD operations: Create, Read, Update, Delete
-- Duplicate game name validation
-- Error handling: NotFoundException, ValidationException
-- Game retrieval by ID
-- All games retrieval
+**`Services/GameServiceTests.cs` (15)**
+- CRUD: create, read (one/all), update, delete
+- Empty/all-list retrieval
+- Validation: empty name, duplicate name, negative `MinPlayers`, `MinPlayers > MaxPlayers`
+- Update with duplicate name / same name
+- `NotFoundException` on get, update, and delete of a missing id
 
-**MatchServiceTests (10 tests)**
-- CRUD operations: Create, Read, Update, Delete
-- GameId validation
-- Match with winner retrieval (using MatchMapper)
-- Prevent GameId change when match has data points
-- Error handling and edge cases
+**`Services/MatchServiceTests.cs` (11)**
+- CRUD: create, read (one/all), update, delete
+- `GetMatchWithWinnerAsync` winner calculation (via `MatchMapper`)
+- Validation: invalid `GameId`; changing `GameId` when data points exist
+- `NotFoundException` on missing ids
 
-**MatchDataPointServiceTests (16 tests)**
-- CRUD operations: Create, Read, Update, Delete
-- Bulk operations: DeleteAllDataPointsForMatchAsync
-- Detailed and simple data point retrieval
-- Data points by match ID retrieval
-- Validation: MatchId must exist, cannot change MatchId on update
-- Error handling: NotFoundException, ValidationException
-- Empty set handling (no data points found)
+**`Services/MatchDataPointServiceTests.cs` (15)**
+- Retrieval: all, detailed (with match/game info), by id, by match id
+- Create; partial update; delete
+- Bulk delete all data points for a match (with and without data)
+- Validation and `NotFoundException` handling
 
-## Integration Tests (Endpoint Layer)
+**`Extensions/DatabaseConnectionInfoTests.cs` (4)**
+- Password is never exposed; non-secret parts map correctly
+- Resolution warning is carried; `ToString()` is safe to log
 
-Integration tests require real PostgreSQL running in Docker. These tests validate actual API behavior including database trigger functionality.
+**`Extensions/DatabaseConnectionInfoTests.cs` → `DatabaseInitializationStateTests` (3)**
+- New state is not completed; `MarkSucceeded` clears the error; `MarkFailed` records it
+
+## Integration tests (Docker required)
+
+Integration tests exercise the real HTTP pipeline against a real PostgreSQL
+instance and validate database triggers.
 
 ### Prerequisites
 
-1. **Docker must be installed** on your machine
-2. **Start the test database container:**
+1. **Docker Desktop must be running.**
+2. **Start the test database:**
 
 ```bash
 docker-compose -f docker-compose.test.yml up -d
 ```
 
-This starts a PostgreSQL 16 container on `localhost:5433` with:
+This starts PostgreSQL 16 on `localhost:5433`:
+
+- Container: `gamescoringapi-test-db`
 - Database: `gamescoringapi_test`
 - User: `testuser`
 - Password: `testpassword`
 
-3. **Verify the container is running:**
+3. **Verify it is up:**
 
 ```bash
 docker ps | findstr gamescoringapi-test-db
 ```
 
-### Run All Integration Tests
+### Run all tests (unit + integration)
+
 ```bash
 dotnet test Api.Tests/Api.Tests.csproj
 ```
 
-### Run Specific Endpoint Tests
+### Run only the integration suites
+
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests"
-dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests"
-dotnet test Api.Tests/Api.Tests.csproj --filter "GameDeleteTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests"
 ```
 
-### Run with Verbose Output
+Or a single suite:
+
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj -v detailed
+dotnet test Api.Tests/Api.Tests.csproj --filter "MatchGetTests"
 ```
 
-### Stop the Test Database
+### Stop the database
+
 ```bash
 docker-compose -f docker-compose.test.yml down
 ```
 
-### Clean Up Database and Restart
+Reset it if the schema/data gets stuck:
+
 ```bash
 docker-compose -f docker-compose.test.yml down -v
 docker-compose -f docker-compose.test.yml up -d
 ```
 
-**Characteristics:**
-- Slower execution (~5-10 seconds per test)
-- Tests against real PostgreSQL (production-like)
-- Validates trigger behavior (Games.MatchesCount auto-update, etc.)
-- Each test gets a clean database (migrated and seeded)
+**Characteristics:** slower (seconds per test), production-like PostgreSQL,
+validates trigger behavior. `TestBase` creates a **unique database per test**
+(`gamescoringapi_test_<8-char-guid>`), applies migrations, and seeds
+`Data/GamesData.json` — so tests never share state.
 
-## Test Structure
+### Integration test coverage
+
+**`Tests/Games/` (16)**
+- `GameGetTests` (7): get by id, not found, filter by id, filter by description, response headers
+- `GamePostTests` (8): single/multiple create, created status, correct data, invalid-data `400`, response headers
+- `GameDeleteTests` (1): deleting removes the entity
+
+**`Tests/Matches/` (18)**
+- `MatchGetTests` (6): all, filter by `gameId`, by id, `includeDataPoints`, not found, response headers
+- `MatchPostTests` (4): create valid, invalid `GameId` `400`, no notes, trigger updates `MatchesCount`
+- `MatchPutTests` (4): update valid, change `GameId` `400`, non-existing `404`, clear notes
+- `MatchDeleteTests` (4): delete valid, non-existing `404`, cascades data points, trigger updates `MatchesCount`
+
+**`Tests/MatchDataPoints/` (24)**
+- `MatchDataPointGetTests` (6): all, detailed, by id, by match id, not found, response headers
+- `MatchDataPointPostTests` (5): valid `201`, invalid `MatchId` `400`, trigger updates `PlayerCount`, negative points allowed, missing player name `400`
+- `MatchDataPointPutTests` (5): valid `204`, partial update, non-existing `404`, change player name, change `MatchId` with existing data `400`
+- `MatchDataPointDeleteTests` (8): delete valid, non-existing `404`, trigger updates `PlayerCount`, deleting several from one match, bulk delete all-valid `204`, mixed valid/invalid multi-status, all-invalid multi-status, empty `400`
+
+## Test structure
 
 ```
 Api.Tests/
-├── Services/
-│   ├── GameServiceTests.cs              # Unit tests for GameService (15 tests)
-│   ├── MatchServiceTests.cs             # Unit tests for MatchService (10 tests)
-│   └── MatchDataPointServiceTests.cs    # Unit tests for MatchDataPointService (16 tests)
-├── Tests/
-│   ├── TestBase.cs                      # Base class with Docker Postgres setup
-│   └── Games/
-│       ├── GameGetTests.cs              # Integration tests for GET endpoints
-│       ├── GamePostTests.cs             # Integration tests for POST endpoints
-│       └── GameDeleteTests.cs           # Integration tests for DELETE endpoints
+├── Services/                          # Unit tests — no Docker
+│   ├── GameServiceTests.cs                (15)
+│   ├── MatchServiceTests.cs               (11)
+│   └── MatchDataPointServiceTests.cs      (15)
+├── Extensions/                        # Unit tests — no Docker
+│   └── DatabaseConnectionInfoTests.cs     (7: 4 + DatabaseInitializationStateTests 3)
+├── Tests/                             # Integration tests — Docker required
+│   ├── TestBase.cs                        # unique DB per test, migrations, seeding
+│   ├── Games/
+│   │   ├── GameGetTests.cs                (7)
+│   │   ├── GamePostTests.cs               (8)
+│   │   └── GameDeleteTests.cs             (1)
+│   ├── Matches/
+│   │   ├── MatchGetTests.cs               (6)
+│   │   ├── MatchPostTests.cs              (4)
+│   │   ├── MatchPutTests.cs               (4)
+│   │   └── MatchDeleteTests.cs            (4)
+│   └── MatchDataPoints/
+│       ├── MatchDataPointGetTests.cs      (6)
+│       ├── MatchDataPointPostTests.cs     (5)
+│       ├── MatchDataPointPutTests.cs      (5)
+│       └── MatchDataPointDeleteTests.cs   (8)
 └── Data/
-    └── GamesData.json                   # Test data for seeding
+    └── GamesData.json                     # seed data, copied to test output
 ```
 
-## CI/CD Integration
+## CI/CD
 
-When tests run in GitHub Actions:
-1. CI workflow starts PostgreSQL service container
-2. Runs full test suite (unit + integration)
-3. Reports results
+In GitHub Actions the full suite runs on every pull request
+([`.github/workflows/run-api-tests.yml`](../.github/workflows/run-api-tests.yml)):
 
-See `.github/workflows/` for CI configuration.
+1. Spins up a PostgreSQL 16 service container on port `5433`.
+2. Restores and builds in Release.
+3. Runs all tests with `ConnectionStrings__DatabaseUrl` pointing at the service.
 
----
+No local Docker is required in CI — GitHub provides the database service.
 
-## Test Commands Reference
+## Command reference
 
-### Quick Test Runs
 ```bash
-# Run all tests
+# All tests (requires Docker)
 dotnet test Api.Tests/Api.Tests.csproj
 
-# Run only unit tests (no Docker needed)
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests"
+# Unit only (no Docker) — 48 tests
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
 
-# Run only integration tests (requires Docker)
-dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointDeleteTests|MatchDataPointPutTests|MatchPutTests"
+# Integration only (requires Docker) — 58 tests
+dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests"
 
-# Run with detailed output
-dotnet test Api.Tests/Api.Tests.csproj -v detailed
-
-# Run specific test class
+# Single class
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchGetTests"
 
-# Run specific test method
+# Single method
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchGetTests.GetMatchById_WithExistingId_ReturnsMatch"
+
+# Detailed output
+dotnet test Api.Tests/Api.Tests.csproj -v detailed
 ```
 
 ## Troubleshooting
 
-### Docker Container Won't Start
+### Docker container won't start
+
 ```bash
-# Check Docker daemon is running
+# Is the daemon running?
 docker ps
 
-# Check for port conflicts (5433)
+# Port conflict on 5433?
 netstat -ano | findstr :5433
 
-# Force recreation
+# Force a clean rebuild
 docker-compose -f docker-compose.test.yml down -v
 docker-compose -f docker-compose.test.yml up -d
 ```
 
-### Tests Fail with "Cannot connect to database"
-- Ensure `docker-compose -f docker-compose.test.yml up -d` ran successfully
-- Check container logs: `docker logs gamescoringapi-test-db`
-- Verify PostgreSQL started: `docker ps`
+### Tests fail with "Cannot connect to database"
 
-### Tests Pass Locally but Fail in CI
-- Ensure CI workflow passes PostgreSQL connection string correctly
-- Check environment variables in CI workflow
-- Verify .NET version matches (net10.0)
+- Confirm `docker-compose -f docker-compose.test.yml up -d` succeeded.
+- Check logs: `docker logs gamescoringapi-test-db`.
+- Confirm the container is running: `docker ps`.
 
-### Unit Tests vs Integration Tests Confusion
-- Unit tests: Fast, isolated, no Docker needed
-- Integration tests: Requires Docker, tests actual behavior including triggers
-- Run unit tests first for quick feedback, integration tests for full validation
+### Tests pass locally but fail in CI
 
-### JSON Deserialization Errors in Tests
-Tests fail with `JsonSerializationException` when trying to deserialize error responses. Ensure:
-- Tests check `response.StatusCode` before deserializing response body
-- Error responses use appropriate status codes (400, 404, etc.)
-- DTO deserialization handles both success and error cases
+- Verify the workflow passes `ConnectionStrings__DatabaseUrl` correctly.
+- Verify the .NET version matches (`net10.0`).
 
-## Individual Test Commands
+### JSON deserialization errors in tests
 
-### Unit Tests - GameServiceTests (15 tests)
-1. **Run all unit tests**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests"
-   ```
+`JsonSerializationException` usually means the test deserialized an error body
+as a success DTO. Check `response.StatusCode` **before** deserializing, and use
+the documented error shapes (`{ "error": ... }` / `{ "errors": [...] }`).
 
-2. **GameServiceTests - GetAllGamesAsync**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.GetAllGamesAsync_WithGames_ReturnsAllGames"
-   ```
+### Unit vs integration confusion
 
-3. **GameServiceTests - GetGameByIdAsync**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.GetGameByIdAsync_WithExistingId_ReturnsGame"
-   ```
-
-4. **GameServiceTests - GetGameByIdAsync NotFound**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.GetGameByIdAsync_WithMissingId_ThrowsNotFoundException"
-   ```
-
-5. **GameServiceTests - CreateGameAsync**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.CreateGameAsync_WithValidGame_InsertsAndReturnsId"
-   ```
-
-6. **GameServiceTests - CreateGameAsync Duplicate**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.CreateGameAsync_WithDuplicateName_ThrowsValidationException"
-   ```
-
-7. **GameServiceTests - UpdateGameAsync**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.UpdateGameAsync_WithValidData_UpdatesGame"
-   ```
-
-8. **GameServiceTests - UpdateGameAsync NotFound**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.UpdateGameAsync_WithInvalidGame_ThrowsNotFoundException"
-   ```
-
-9. **GameServiceTests - DeleteGameAsync**
-   ```bash
-   dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.DeleteGameAsync_DeletesSuccessfully"
-   ```
-
-10. **GameServiceTests - DeleteGameAsync NotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameServiceTests.DeleteGameAsync_WithMissingId_ThrowsNotFoundException"
-    ```
-
-### Unit Tests - MatchServiceTests (11 tests)
-11. **Run all MatchServiceTests**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests"
-    ```
-
-12. **MatchServiceTests - GetAllMatchesAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.GetAllMatchesAsync_WithMatches_ReturnsAllMatches"
-    ```
-
-13. **MatchServiceTests - GetMatchByIdAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.GetMatchByIdAsync_WithExistingId_ReturnsMatch"
-    ```
-
-14. **MatchServiceTests - GetMatchByIdAsync NotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.GetMatchByIdAsync_WithMissingId_ThrowsNotFoundException"
-    ```
-
-15. **MatchServiceTests - GetMatchWithWinnerAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.GetMatchWithWinnerAsync_WithDataPoints_CalculatesWinner"
-    ```
-
-16. **MatchServiceTests - CreateMatchAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.CreateMatchAsync_WithValidRequest_CreatesMatch"
-    ```
-
-17. **MatchServiceTests - CreateMatchAsync Invalid**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.CreateMatchAsync_WithInvalidGameId_ThrowsValidationException"
-    ```
-
-18. **MatchServiceTests - UpdateMatchAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.UpdateMatchAsync_WithValidData_UpdatesMatch"
-    ```
-
-19. **MatchServiceTests - UpdateMatchAsync with DataPoints**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.UpdateMatchAsync_WithGameIdChangeAndDataPoints_ThrowsValidationException"
-    ```
-
-20. **MatchServiceTests - UpdateMatchAsync NotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.UpdateMatchAsync_WithMissingId_ThrowsNotFoundException"
-    ```
-
-21. **MatchServiceTests - DeleteMatchAsync**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.DeleteMatchAsync_WithExistingId_DeletesMatch"
-    ```
-
-22. **MatchServiceTests - DeleteMatchAsync NotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests.DeleteMatchAsync_WithMissingId_ThrowsNotFoundException"
-    ```
-
-### Integration Tests - GameGetTests
-23. **Run all GameGetTests**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests"
-    ```
-
-24. **GetGameById_ReturnsGame**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests.GetGameById_ReturnsGame"
-    ```
-
-25. **GetGameById_ReturnsNotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests.GetGameById_ReturnsNotFound"
-    ```
-
-26. **GetGamesById_ReturnsGameIfExists**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests.GetGamesById_ReturnsGameIfExists"
-    ```
-
-27. **GetGamesById_ReturnsNotFound**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests.GetGamesById_ReturnsNotFound"
-    ```
-
-28. **GetGamesByDescription_ReturnsGameIfExists**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests.GetGamesByDescription_ReturnsGameIfExists"
-    ```
-
-### Integration Tests - GamePostTests
-29. **Run all GamePostTests**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests"
-    ```
-
-30. **CreateSingleGame_ReturnsCorrectData**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests.CreateSingleGame_ReturnsCorrectData"
-    ```
-
-31. **CreateSingleGame_ResponseHeadersContainExpectedValues**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests.CreateSingleGame_ResponseHeadersContainExpectedValues"
-    ```
-
-32. **CreateMultipleGames_ReturnsCorrectData**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests.CreateMultipleGames_ReturnsCorrectData"
-    ```
-
-33. **CreateMultipleGames_ReturnsCreated**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests.CreateMultipleGames_ReturnsCreated"
-    ```
-
-34. **CreateMultipleGames_ResponseHeadersContainExpectedValues**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests.CreateMultipleGames_ResponseHeadersContainExpectedValues"
-    ```
-
-### Integration Tests - GameDeleteTests
-35. **Run all GameDeleteTests**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameDeleteTests"
-    ```
-
-36. **DeleteGameById_DeletesCorrectEntity**
-    ```bash
-    dotnet test Api.Tests/Api.Tests.csproj --filter "GameDeleteTests.DeleteGameById_DeletesCorrectEntity"
-    ```
-
-## Example Workflow
-
-```bash
-# 1. Start test database
-docker-compose -f docker-compose.test.yml up -d
-
-# 2. Run unit tests (quick feedback)
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests"
-
-# 3. Run integration tests (full validation)
-dotnet test Api.Tests/Api.Tests.csproj
-
-# 4. Check specific endpoint tests
-dotnet test Api.Tests/Api.Tests.csproj --filter "GamePostTests" -v detailed
-
-# 5. Clean up when done
-docker-compose -f docker-compose.test.yml down
-```
+- Unit tests: fast, isolated, no Docker, **no trigger coverage**.
+- Integration tests: Docker, real PostgreSQL, **only place triggers are validated**.
+- Run unit first for fast feedback, then integration for full validation.
