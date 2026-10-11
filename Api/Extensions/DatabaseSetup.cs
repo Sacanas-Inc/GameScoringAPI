@@ -1,21 +1,41 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace GameScoringAPI.Extensions;
 
 public static class DatabaseSetup
 {
+    private const string LoggerCategory = "GameScoringAPI.Database";
+
     /// <summary>
     /// Configure DbContext using DATABASE_URL env var (preferred) or DefaultConnection from config.
     /// Throws if no connection available.
-    /// 
+    ///
     /// Extend the WebApplicationBuilder using the THIS keyword, adding the methods to the builder without modifying the original class.
     /// </summary>
     public static void ConfigureDatabaseServices(this WebApplicationBuilder builder)
     {
-        // TODO: .env file? It doesnt seem right to use appsettings
-        var envDatabaseUrl = builder.Configuration.GetConnectionString("DatabaseUrl");
-        var configConn = builder.Configuration.GetConnectionString("DefaultConnection");
-        string? connectionString = null;
+        var (connectionString, info) = ResolveConnectionString(builder.Configuration);
+
+        // Expose the safe connection description and initialization state for startup logging and health checks.
+        builder.Services.AddSingleton(info);
+        builder.Services.AddSingleton<DatabaseInitializationState>();
+
+        // Register DbContext
+        builder.Services.AddDbContext<GameDBContext>(options => options.UseNpgsql(connectionString));
+    }
+
+    /// <summary>
+    /// Resolves the Postgres connection string (preferring ConnectionStrings:DatabaseUrl, then
+    /// DefaultConnection) and returns it together with a password-free description for logging.
+    /// Throw if neither is configured.
+    /// </summary>
+    private static (string connectionString, DatabaseConnectionInfo info) ResolveConnectionString(IConfiguration configuration)
+    {
+        var envDatabaseUrl = configuration.GetConnectionString("DatabaseUrl");
+        var configConn = configuration.GetConnectionString("DefaultConnection");
 
         // Prefer DATABASE_URL, else appsettings DefaultConnection
         if (!string.IsNullOrWhiteSpace(envDatabaseUrl))
@@ -38,46 +58,94 @@ public static class DatabaseSetup
                     TrustServerCertificate = true
                 };
 
-                connectionString = csBuilder.ToString();
-                Console.WriteLine($"Using DATABASE_URL Postgres. Host: {csBuilder.Host}, DB: {csBuilder.Database}");
+                var connectionString = csBuilder.ToString();
+                var info = DatabaseConnectionInfo.FromConnectionString("DatabaseUrl", connectionString);
+                return (connectionString, info);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to parse DATABASE_URL: {ex.Message}");
-                connectionString = null;
+                // No logger is available yet during the builder phase; carry the warning into startup logging.
+                var warning = $"Failed to parse ConnectionStrings:DatabaseUrl (expected a postgresql:// URI): {ex.Message}";
+
+                if (!string.IsNullOrWhiteSpace(configConn))
+                {
+                    return (configConn, DatabaseConnectionInfo.FromConnectionString("DefaultConnection", configConn, warning));
+                }
+
+                throw new InvalidOperationException($"{warning} No fallback DefaultConnection is configured.", ex);
             }
         }
-        else
+
+        if (!string.IsNullOrWhiteSpace(configConn))
         {
-            Console.WriteLine($"DATABASE_URL not set. Checking DefaultConnection in configuration.");
+            return (configConn, DatabaseConnectionInfo.FromConnectionString("DefaultConnection", configConn));
         }
 
-        if (string.IsNullOrWhiteSpace(connectionString) && !string.IsNullOrWhiteSpace(configConn))
-        {
-            connectionString = configConn;
-            Console.WriteLine($"Using DefaultConnection from configuration.");
-        }
-
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("No Postgres connection configured. Set DATABASE_URL env var or DefaultConnection in configuration.");
-        }
-
-        // Register DbContext
-        builder.Services.AddDbContext<GameDBContext>(options => options.UseNpgsql(connectionString));
+        throw new InvalidOperationException(
+            "No Postgres connection configured. Set the App Setting 'ConnectionStrings__DatabaseUrl' or DefaultConnection in configuration.");
     }
 
     /// <summary>
     /// Apply migrations and create PL/pgSQL functions + triggers for Postgres.
     /// Safe to call multiple times - checks if functions/triggers exist before creating.
+    ///
+    /// On migration failure the app logs a critical error and, unless Database:FailFastOnStartup is true,
+    /// continues in degraded mode so the health endpoint can report the failure instead of a bare 500.30.
     /// </summary>
     public static void InitializeDatabase(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<GameDBContext>();
+        var services = scope.ServiceProvider;
 
-        // Apply migrations for relational provider (Postgres)
-        dbContext.Database.Migrate();
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory);
+        var dbContext = services.GetRequiredService<GameDBContext>();
+        var state = services.GetRequiredService<DatabaseInitializationState>();
+        var info = services.GetRequiredService<DatabaseConnectionInfo>();
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        logger.LogInformation("Database connection resolved. {DatabaseTarget}", info);
+
+        if (info.ResolutionWarning is not null)
+        {
+            logger.LogWarning("{Warning}", info.ResolutionWarning);
+        }
+
+        if (info.Source == "DefaultConnection" && !app.Environment.IsDevelopment())
+        {
+            logger.LogWarning(
+                "ConnectionStrings:DatabaseUrl is not set; falling back to DefaultConnection for environment {Environment}. " +
+                "In Azure set the App Setting 'ConnectionStrings__DatabaseUrl'.",
+                app.Environment.EnvironmentName);
+        }
+
+        var failFast = configuration.GetValue("Database:FailFastOnStartup", false);
+
+        try
+        {
+            logger.LogInformation("Applying database migrations to {Host}/{Database}...", info.Host, info.Database);
+            dbContext.Database.Migrate();
+
+            var applied = dbContext.Database.GetAppliedMigrations().ToList();
+            logger.LogInformation(
+                "Database migrations applied. Count={Count}, Migrations={Migrations}",
+                applied.Count,
+                string.Join(", ", applied));
+        }
+        catch (Exception ex)
+        {
+            state.MarkFailed(ex.Message);
+            logger.LogCritical(ex, "Database migration failed for Host={Host}, Database={Database}.", info.Host, info.Database);
+
+            if (failFast)
+            {
+                throw;
+            }
+
+            logger.LogError(
+                "Continuing in degraded mode: database endpoints will fail and GET /health will report Unhealthy. " +
+                "Set 'Database:FailFastOnStartup' to true to crash on startup instead.");
+            return;
+        }
 
         if (dbContext.Database.IsRelational())
         {
@@ -101,12 +169,16 @@ public static class DatabaseSetup
 
                 dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_match_player_count_delete ON \"MatchDataPoint\" CASCADE;");
                 dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDelete);
+
+                logger.LogInformation("Database triggers and functions ensured.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Error creating functions/triggers: {ex.Message}");
+                logger.LogWarning(ex, "Error creating database triggers/functions.");
                 // Don't throw - continue if triggers already exist
             }
         }
+
+        state.MarkSucceeded();
     }
 }

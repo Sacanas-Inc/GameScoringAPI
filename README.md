@@ -83,6 +83,7 @@ Minimal game scoring API. Store games, matches, match data points, compute simpl
 - `GET /matches`, `GET /match/{id}` (optional `includeDataPoints`)
 - `POST /match`, `PUT /match/{id}`
 - `GET /match-data-points/all`, `POST /match-data-point/{MatchId}`
+- `GET /health` — readiness check (200 Healthy / 503 Unhealthy; reports database availability)
 
 See code for full list and request/response shapes.
 
@@ -128,6 +129,8 @@ GitHub Actions runs the full test suite on every pull request ([`.github/workflo
 - **Triggers & Postgres Only**: Triggers execute via `ExecuteSqlRaw` only when `Database.IsRelational()` is true. Unit tests use EF Core InMemory and skip trigger behavior — use integration tests to validate trigger logic.
 - **Migration Workflow**: Schema created via `dotnet ef database update`, triggers initialized on app startup in `InitializeDatabase()`.
 - **Connection Priority**: `DATABASE_URL` env var takes precedence over `appsettings.json` DefaultConnection.
+- **Startup Logging**: the resolved database target (source/host/port/database/user — never the password), migration lifecycle, and trigger creation are logged via `ILogger` category `GameScoringAPI.Database`. A `DefaultConnection` fallback outside Development logs a warning.
+- **Degraded Mode**: if migrations fail at startup, the app logs `Critical`, records the failure, and keeps running so `GET /health` returns `503` instead of a bare `HTTP 500.30`. Set `Database:FailFastOnStartup` to `true` to crash on startup instead.
 - **PutMatch Security**: Endpoint prevents changing `GameId` when match has data points to avoid data leakage.
 - **CORS Policy**: Allows `http://localhost:3000` and one Azure static app; adjust in [Api/Program.cs](Api/Program.cs) if needed.
 
@@ -155,6 +158,20 @@ dotnet run  # InitializeDatabase() re-creates triggers
    ```bash
    dotnet run
    ```
+
+### Azure App Service (production)
+
+`web.config` forces `ASPNETCORE_ENVIRONMENT=Production`, so `appsettings.Development.json` is **not** loaded. Configure the connection as an **App Setting** (not a portal "Connection string", which maps to a `POSTGRESQLCONNSTR_` env var the app does not read):
+
+```
+Name:  ConnectionStrings__DatabaseUrl
+Value: postgresql://<user>:<pass>@<host>/<db>?sslmode=require
+```
+
+Verify after deploy:
+- Log stream / `D:\home\LogFiles\stdout\stdout_*.log` shows `Database connection resolved. Source=DatabaseUrl, Host=...` (never the password).
+- `GET https://<app>.azurewebsites.net/health` returns `200 Healthy`.
+- If it returns `503`, the response body and the `Critical`/`Warning` startup logs state why.
 
 ## Next Steps
 - Monitor trigger performance on high-insert scenarios.

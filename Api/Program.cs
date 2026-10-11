@@ -42,8 +42,19 @@ builder.Services.AddScoped<MatchMapper>();
 
 var app = builder.Build();
 
+app.Logger.LogInformation("Starting GameScoringAPI in {Environment} environment.", app.Environment.EnvironmentName);
+
 // Database initialization (migrations, triggers)
-app.InitializeDatabase();
+try
+{
+    app.InitializeDatabase();
+}
+catch (Exception ex)
+{
+    // Reached when Database:FailFastOnStartup is true (or initialization failed before degraded mode engaged).
+    app.Logger.LogCritical(ex, "Database initialization failed during startup.");
+    throw;
+}
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>
@@ -70,6 +81,9 @@ app.MapMatchDataPointEndpoints();
 
 // Test endpoints
 app.MapTestEndpoints();
+
+// Health/readiness endpoint (reports database availability)
+app.MapHealthEndpoints();
 
 app.Run();
 
