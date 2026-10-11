@@ -96,9 +96,9 @@ Hybrid test strategy: unit tests are fast and isolated; integration tests valida
 ### Unit Tests (no Docker required)
 Test service logic in isolation using EF Core InMemory provider.
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
 ```
-Covers: `GameServiceTests` (15), `MatchServiceTests` (10), `MatchDataPointServiceTests` (16) — **41 tests**.
+Covers `GameServiceTests` (15), `MatchServiceTests` (11), `MatchDataPointServiceTests` (15), and the connection/state unit tests (7) — **48 tests**. See [Api.Tests/TESTING.md](Api.Tests/TESTING.md) for the full breakdown.
 
 ### Integration Tests (requires Docker)
 Test actual API endpoints against a real PostgreSQL instance. Validates trigger behavior (`Games.MatchesCount`, `Matches.PlayerCount` auto-update).
