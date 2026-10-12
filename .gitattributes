@@ -1,0 +1,4 @@
+# Ensure shell scripts are always checked out with LF, regardless of the
+# platform's core.autocrlf setting. CRLF in a .sh breaks the shebang and
+# commands on Git Bash/WSL/Linux.
+*.sh text eol=lf
