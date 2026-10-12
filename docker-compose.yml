@@ -1,0 +1,25 @@
+# Explicit project name so the dev stack never collides with (or is flagged as an
+# orphan of) the test stack in docker-compose.test.yml, which uses the default
+# directory-derived project name.
+name: gamescoringapi-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gamescoringapi-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gamescoringdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - dev-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gamescoringdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dev-db-volume:
