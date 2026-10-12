@@ -1,3 +1,8 @@
+# Explicit project name so the dev stack never collides with (or is flagged as an
+# orphan of) the test stack in docker-compose.test.yml, which uses the default
+# directory-derived project name.
+name: gamescoringapi-dev
+
 services:
   postgres:
     image: postgres:16-alpine
