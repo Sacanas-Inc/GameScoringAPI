@@ -18,8 +18,7 @@ points, and computes simple stats (totals, winning player). Data lives in
   paths you commit.
 
 Read `README.md` first for setup, and `Api.Tests/TESTING.md` for the test
-strategy. `ROADMAP.md` and `BREAKING_CHANGES.md` contain useful context.
-
+strategy.
 ## Build, run, test
 
 Run commands from the **repository root** unless noted.
@@ -215,6 +214,41 @@ migrations is a known P3 item in `ROADMAP.md`.
   changing response shapes or status codes.
 - `ROADMAP.md` — outstanding work (P1–P3). Useful TODO source.
 
+## Keeping the README and tests in sync
+
+A change is not done until the documentation and tests that describe it are
+updated. Treat stale docs or failing/absent tests as part of the change, not a
+follow-up task.
+
+### Update the README with every behavior change
+
+`README.md` is authoritative for setup, configuration, endpoints, and
+deployment. Whenever you:
+
+- add, rename, or remove an endpoint → update the endpoint list (method, path,
+  request/response shape, and status codes).
+- change config keys, environment variables, ports, or connection resolution →
+  update the setup/config sections.
+- add a migration, dependency, or startup step → update the setup/run
+  instructions.
+
+Match the README's existing structure and tone, and don't duplicate details that
+belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
+
+### Update the tests with every behavior change
+
+- Add or extend tests for any new or changed behavior. Service logic →
+  unit tests in `Api.Tests/Services/` (InMemory); endpoints, mapping, triggers,
+  or schema → integration tests in `Api.Tests/Tests/` (real Postgres).
+- Bug fix → add a regression test that fails before the fix and passes after.
+- Never delete, skip, or weaken a test to get the suite green — fix the code or
+  correct the test's expectations.
+- Prefer unit tests when the logic can be asserted without the DB; use
+  integration tests when trigger side effects or real Postgres behavior matter.
+- When you add or remove tests, update the counts and per-class breakdown in
+  `Api.Tests/TESTING.md` (currently **48 unit + 58 integration = 106**) and the
+  totals in this file.
+
 ## Known tech debt (don't accidentally make it worse)
 
 - `Api/Validations/GameValidation.cs` is unreferenced dead code (superseded by
@@ -233,4 +267,7 @@ migrations is a known P3 item in `ROADMAP.md`.
    or the DB schema (start the Docker DB first).
 4. Error responses follow the shapes above; new endpoints carry correct
    `WithName`/`WithTags`.
-5. No secrets or `appsettings*.json` added to git.
+5. `README.md` updated for any endpoint, config, or setup change.
+6. Tests added/updated for any behavior change, and `TESTING.md` counts (plus
+   the totals here) kept in sync.
+7. No secrets or `appsettings*.json` added to git.
