@@ -171,11 +171,15 @@ dotnet ef database update
 ### Regenerate Triggers
 The trigger functions/triggers are defined in the `AddMatchCountTriggers` migration
 (`CREATE OR REPLACE FUNCTION` + `DROP TRIGGER IF EXISTS`/`CREATE TRIGGER`), so a
-normal migration update (or app startup) is idempotent. To force a clean re-apply:
+normal migration update (or app startup) is idempotent — the objects are replaced
+in place and no manual step is needed. To force a clean re-apply of *only* the
+trigger migration (e.g. after hand-editing the SQL in a dev database), roll back to
+the migration before it — **not** `database update 0`, which would drop every table
+and all data:
 ```bash
 cd Api
-dotnet ef database update 0        # roll back (drops the triggers/functions)
-dotnet ef database update          # re-apply (recreates them)
+dotnet ef database update 20260701204629_InitialCreate   # unapply only the trigger migration
+dotnet ef database update                                # re-apply it
 ```
 
 ## Deployment
