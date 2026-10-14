@@ -7,7 +7,7 @@ Minimal game scoring API. Store games, matches, match data points, compute simpl
 - Compute match stats and winning player
 - Postgres DB with PL/pgSQL triggers auto-updating match/player counts
 - Swagger UI for API exploration
-- EF Core migrations with trigger initialization
+- EF Core migrations that create the schema and the trigger functions/triggers
 
 ## Tech Stack
 - .NET 10 minimal APIs
@@ -34,7 +34,7 @@ dotnet run --project Api
 
 - The container uses **`postgres` / `postgres`** and database **`gamescoringdb`**, matching
   the `DefaultConnection` example in [Setup](#setup).
-- Migrations and PL/pgSQL triggers initialize automatically on startup.
+- Migrations (including the PL/pgSQL trigger definitions) initialize automatically on startup.
 - Stop it with `docker-compose down` (data is kept in the `dev-db-volume` volume); use
   `docker-compose down -v` to also delete the data.
 - **Connection precedence:** `ConnectionStrings:DatabaseUrl` (or the env var
@@ -69,7 +69,7 @@ dotnet run --project Api
    dotnet ef database update
    ```
    
-   This creates schema and initializes PL/pgSQL triggers.
+   This creates the schema and the PL/pgSQL trigger functions/triggers.
 
 3. **Run API**
 
@@ -88,11 +88,11 @@ dotnet run --project Api
 - `Matches.PlayerCount` → updates (distinct player count) on MatchDataPoint insert/delete
 
 **Trigger Files:**
-- Function definitions: [Api/Sql/Triggers/SqlTriggers.cs](Api/Sql/Triggers/SqlTriggers.cs)
-- Initialization: [Api/Extensions/DatabaseSetup.cs](Api/Extensions/DatabaseSetup.cs) `InitializeDatabase()`
+- Function/trigger definitions: [Api/Migrations/20261014211106_AddMatchCountTriggers.cs](Api/Migrations/20261014211106_AddMatchCountTriggers.cs)
+- Initialization: [Api/Extensions/DatabaseSetup.cs](Api/Extensions/DatabaseSetup.cs) `InitializeDatabase()` (applies migrations)
 - Schema: [Api/Migrations/20260701204629_InitialCreate.cs](Api/Migrations/20260701204629_InitialCreate.cs)
 
-**Migration Workflow:** `Program.cs` calls `Migrate()` on startup, then creates triggers via `ExecuteSqlRaw`.
+**Migration Workflow:** `Program.cs` calls `Migrate()` on startup; the trigger functions/triggers are created by the `AddMatchCountTriggers` migration (no separate startup DDL).
 
 ## API Summary
 - Entry point: [Api/Program.cs](Api/Program.cs)
@@ -150,10 +150,10 @@ GitHub Actions runs the full test suite on every pull request ([`.github/workflo
 - No local Docker required in CI
 
 ## Notes
-- **Triggers & Postgres Only**: Triggers execute via `ExecuteSqlRaw` only when `Database.IsRelational()` is true. Unit tests use EF Core InMemory and skip trigger behavior — use integration tests to validate trigger logic.
-- **Migration Workflow**: Schema created via `dotnet ef database update`, triggers initialized on app startup in `InitializeDatabase()`.
+- **Triggers & Postgres Only**: Triggers are defined in the `AddMatchCountTriggers` migration and applied through `Migrate()`. Unit tests use EF Core InMemory and skip trigger behavior — use integration tests to validate trigger logic.
+- **Migration Workflow**: Schema and triggers are created via `dotnet ef database update` / `Database.Migrate()`; no separate startup DDL runs.
 - **Connection Priority**: `ConnectionStrings:DatabaseUrl` (env var `ConnectionStrings__DatabaseUrl`) takes precedence over `ConnectionStrings:DefaultConnection`.
-- **Startup Logging**: the resolved database target (source/host/port/database/user — never the password), migration lifecycle, and trigger creation are logged via `ILogger` category `GameScoringAPI.Database`. A `DefaultConnection` fallback outside Development logs a warning.
+- **Startup Logging**: the resolved database target (source/host/port/database/user — never the password) and migration lifecycle are logged via `ILogger` category `GameScoringAPI.Database`. A `DefaultConnection` fallback outside Development logs a warning.
 - **Degraded Mode**: if migrations fail at startup, the app logs `Critical`, records the failure, and keeps running so `GET /health` returns `503` instead of a bare `HTTP 500.30`. Set `Database:FailFastOnStartup` to `true` to crash on startup instead.
 - **Gitignored config:** `appsettings.json` / `appsettings.Development.json` are not tracked. Create them locally (or set the `ConnectionStrings__DatabaseUrl` env var); in CI the deploy workflow generates `appsettings.Production.json` from the `DATABASE_URL` repository secret.
 - **PutMatch Security:** Endpoint prevents changing `GameId` when match has data points to avoid data leakage.
@@ -169,17 +169,20 @@ dotnet ef database update
 ```
 
 ### Regenerate Triggers
-Triggers re-created on app startup if they exist (DROP + CREATE). Manual re-trigger:
+The trigger functions/triggers are defined in the `AddMatchCountTriggers` migration
+(`CREATE OR REPLACE FUNCTION` + `DROP TRIGGER IF EXISTS`/`CREATE TRIGGER`), so a
+normal migration update (or app startup) is idempotent. To force a clean re-apply:
 ```bash
 cd Api
-dotnet run  # InitializeDatabase() re-creates triggers
+dotnet ef database update 0        # roll back (drops the triggers/functions)
+dotnet ef database update          # re-apply (recreates them)
 ```
 
 ## Deployment
 
 1. Ensure the Postgres database exists and is accessible.
 2. Provide the connection string (see **Configuration** below).
-3. Run the app — migrations + triggers initialize automatically:
+3. Run the app — migrations (which include the triggers) initialize automatically:
    ```bash
    dotnet run
    ```
