@@ -31,7 +31,7 @@ dotnet build GameScoringAPI.sln
 dotnet run --project Api
 
 # Unit tests only (fast, no Docker)
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests|DatabaseSetupTests"
 
 # All tests (integration tests need the Docker Postgres below)
 dotnet test Api.Tests/Api.Tests.csproj
@@ -194,7 +194,7 @@ migration).
   the Docker DB on port 5433.
 - Test data lives in `Api.Tests/Data/*.json`, loaded via `TestBase.GetDto<T>` and
   copied to the output directory.
-- Totals: **48 unit + 59 integration = 107**. `TESTING.md` has the per-class
+- Totals: **49 unit + 59 integration = 108**. `TESTING.md` has the per-class
   breakdown and run commands; keep it in sync when you add tests.
 
 ## CI/CD
@@ -247,7 +247,7 @@ belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
 - Prefer unit tests when the logic can be asserted without the DB; use
   integration tests when trigger side effects or real Postgres behavior matter.
 - When you add or remove tests, update the counts and per-class breakdown in
-  `Api.Tests/TESTING.md` (currently **48 unit + 59 integration = 107**) and the
+  `Api.Tests/TESTING.md` (currently **49 unit + 59 integration = 108**) and the
   totals in this file.
 
 ## Known tech debt (don't accidentally make it worse)
@@ -262,7 +262,7 @@ belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
 ## Quick checklist before committing
 
 1. `dotnet build GameScoringAPI.sln` → 0 warnings, 0 errors.
-2. `dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"` passes (no Docker).
+2. `dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests|DatabaseSetupTests"` passes (no Docker).
 3. Integration tests pass if you touched endpoints, services, mapping, triggers,
    or the DB schema (start the Docker DB first).
 4. Error responses follow the shapes above; new endpoints carry correct

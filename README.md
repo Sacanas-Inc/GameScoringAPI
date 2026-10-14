@@ -118,9 +118,9 @@ Hybrid test strategy: unit tests are fast and isolated; integration tests valida
 ### Unit Tests (no Docker required)
 Test service logic in isolation using EF Core InMemory provider.
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests|DatabaseSetupTests"
 ```
-Covers `GameServiceTests` (15), `MatchServiceTests` (11), `MatchDataPointServiceTests` (15), and the connection/state unit tests (7) — **48 tests**. See [Api.Tests/TESTING.md](Api.Tests/TESTING.md) for the full breakdown.
+Covers `GameServiceTests` (15), `MatchServiceTests` (11), `MatchDataPointServiceTests` (15), and the connection/state/setup unit tests (8) — **49 tests**. See [Api.Tests/TESTING.md](Api.Tests/TESTING.md) for the full breakdown.
 
 ### Integration Tests (requires Docker)
 Test actual API endpoints against a real PostgreSQL instance. Validates trigger behavior (`Games.MatchesCount`, `Matches.PlayerCount` auto-update).
@@ -153,7 +153,7 @@ GitHub Actions runs the full test suite on every pull request ([`.github/workflo
 - **Triggers & Postgres Only**: Triggers are defined in the `AddMatchCountTriggers` migration and applied through `Migrate()`. Unit tests use EF Core InMemory and skip trigger behavior — use integration tests to validate trigger logic.
 - **Migration Workflow**: Schema and triggers are created via `dotnet ef database update` / `Database.Migrate()`; no separate startup DDL runs.
 - **Connection Priority**: `ConnectionStrings:DatabaseUrl` (env var `ConnectionStrings__DatabaseUrl`) takes precedence over `ConnectionStrings:DefaultConnection`.
-- **Startup Logging**: the resolved database target (source/host/port/database/user — never the password) and migration lifecycle are logged via `ILogger` category `GameScoringAPI.Database`. A `DefaultConnection` fallback outside Development logs a warning.
+- **Startup Logging**: the resolved database target (source/host/port/database/user — never the password) and migration lifecycle are logged via `ILogger` category `GameScoringAPI.Database`. A `DefaultConnection` fallback outside Development logs a warning. Failures that happen **before the host is built** (for example a missing connection string) have no `ILogger` yet, so they are written to stdout/stderr and surface in the Azure **Log Stream** (`D:\home\LogFiles\stdout`) instead of only the Windows Event Log.
 - **Degraded Mode**: if migrations fail at startup, the app logs `Critical`, records the failure, and keeps running so `GET /health` returns `503` instead of a bare `HTTP 500.30`. Set `Database:FailFastOnStartup` to `true` to crash on startup instead.
 - **Gitignored config:** `appsettings.json` / `appsettings.Development.json` are not tracked. Create them locally (or set the `ConnectionStrings__DatabaseUrl` env var); in CI the deploy workflow generates `appsettings.Production.json` from the `DATABASE_URL` repository secret.
 - **PutMatch Security:** Endpoint prevents changing `GameId` when match has data points to avoid data leakage.
@@ -236,6 +236,8 @@ Verify after deploy:
 - Log stream / `D:\home\LogFiles\stdout\stdout_*.log` shows `Database connection resolved. Source=DatabaseUrl, Host=...` (never the password).
 - `GET https://<app>.azurewebsites.net/health` returns `200 Healthy`.
 - If it returns `503`, the response body and the `Critical`/`Warning` startup logs state why.
+
+> **App Service logging.** `web.config` sets `stdoutLogFile="\\?\%home%\LogFiles\stdout"`, so the ASP.NET Core Module writes stdout/stderr to `D:\home\LogFiles\stdout\stdout_*.log` — the folder **Log Stream** tails. In the portal, enable **Monitoring → App Service logs → Application logging (File System)** and set a retention period (optionally via the `WEBSITE_HTTPLOGGING_RETENTION_DAYS` App Setting) so the files persist. Failures that occur before the host is built (for example a missing connection string) are written to stdout/stderr for exactly this reason, so they appear in Log Stream instead of only the Windows Event Log.
 
 ## Next Steps
 - Monitor trigger performance on high-insert scenarios.

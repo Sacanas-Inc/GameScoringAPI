@@ -4,11 +4,11 @@ How to run and understand the tests for GameScoringAPI.
 
 ## Overview
 
-The suite has **107 tests** split into two categories:
+The suite has **108 tests** split into two categories:
 
 | Category | Count | Needs Docker? | Location |
 | --- | ---: | :---: | --- |
-| **Unit** — service/business logic on EF Core InMemory | 48 | No | `Api.Tests/Services/`, `Api.Tests/Extensions/` |
+| **Unit** — service/business logic on EF Core InMemory | 49 | No | `Api.Tests/Services/`, `Api.Tests/Extensions/` |
 | **Integration** — real endpoints against PostgreSQL | 59 | Yes | `Api.Tests/Tests/` |
 
 Unit tests are fast and isolated (each gets its own in-memory database).
@@ -25,10 +25,10 @@ Unit tests use EF Core's InMemory provider and run in about a second.
 ### Run all unit tests
 
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests|DatabaseSetupTests"
 ```
 
-> The three terms are needed because they live in different classes. The older,
+> The filter terms are needed because the tests live in different classes. The older,
 > shorter `--filter "ServiceTests"` runs only the three `*ServiceTests` classes
 > (41 tests) and misses the `Extensions` unit tests.
 
@@ -40,6 +40,7 @@ dotnet test Api.Tests/Api.Tests.csproj --filter "MatchServiceTests"
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchDataPointServiceTests"
 dotnet test Api.Tests/Api.Tests.csproj --filter "DatabaseConnectionInfoTests"
 dotnet test Api.Tests/Api.Tests.csproj --filter "DatabaseInitializationStateTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "DatabaseSetupTests"
 ```
 
 ### Run a specific method
@@ -85,6 +86,9 @@ logic only — **not** trigger behavior.
 
 **`Extensions/DatabaseConnectionInfoTests.cs` → `DatabaseInitializationStateTests` (3)**
 - New state is not completed; `MarkSucceeded` clears the error; `MarkFailed` records it
+
+**`Extensions/DatabaseSetupTests.cs` (1)**
+- `ConfigureDatabaseServices` throws `InvalidOperationException` when no connection string is configured
 
 ## Integration tests (Docker required)
 
@@ -180,7 +184,8 @@ Api.Tests/
 │   ├── MatchServiceTests.cs               (11)
 │   └── MatchDataPointServiceTests.cs      (15)
 ├── Extensions/                        # Unit tests — no Docker
-│   └── DatabaseConnectionInfoTests.cs     (7: 4 + DatabaseInitializationStateTests 3)
+│   ├── DatabaseConnectionInfoTests.cs     (7: 4 + DatabaseInitializationStateTests 3)
+│   └── DatabaseSetupTests.cs              (1)
 ├── Tests/                             # Integration tests — Docker required
 │   ├── TestBase.cs                        # unique DB per test, migrations, seeding
 │   ├── Games/
@@ -220,8 +225,8 @@ No local Docker is required in CI — GitHub provides the database service.
 # All tests (requires Docker)
 dotnet test Api.Tests/Api.Tests.csproj
 
-# Unit only (no Docker) — 48 tests
-dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
+# Unit only (no Docker) — 49 tests
+dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests|DatabaseSetupTests"
 
 # Integration only (requires Docker) — 59 tests
 dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests|TriggerMigrationTests"
