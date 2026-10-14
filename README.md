@@ -143,6 +143,20 @@ Test actual API endpoints against a real PostgreSQL instance. Validates trigger 
 
 Each test gets its own isolated database (unique name per `TestBase` instance) — no shared state between tests.
 
+### Smoke Test (running API)
+
+`scripts/smoke-test.ps1` (PowerShell 7) validates a running API end to end: Games CRUD, match creation, and the trigger-maintained counters (`Games.MatchesCount`, `Matches.PlayerCount`). Use it as a pre-deploy check.
+
+```powershell
+# Local (dev profile; -SkipCertificateCheck accepts the self-signed dev cert)
+pwsh ./scripts/smoke-test.ps1 -BaseUrl https://localhost:7191 -SkipCertificateCheck
+
+# Deployed
+pwsh ./scripts/smoke-test.ps1 -BaseUrl https://gamescoringapi.azurewebsites.net
+```
+
+It creates one game named `SMOKE_<timestamp>` and deletes it at the end — even on failure — so it is safe to run against any environment. The exit code is `0` when every step passes and non-zero otherwise, which makes it suitable for CI. PowerShell 7+ is required (`-SkipHttpErrorCheck` / `-SkipCertificateCheck`).
+
 ### CI/CD
 GitHub Actions runs the full test suite on every pull request ([`.github/workflows/run-api-tests.yml`](.github/workflows/run-api-tests.yml)):
 - Spins up PostgreSQL 16 as a service container
