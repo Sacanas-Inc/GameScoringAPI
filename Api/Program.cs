@@ -28,7 +28,21 @@ builder.Services.AddCors(options =>
 
 
 // Configure database services (DbContext) and connection.
-builder.ConfigureDatabaseServices();
+// This runs before builder.Build(), so no host, ILogger, or console logger provider
+// exists yet. If it throws, write the failure to stdout/stderr (which Azure App Service
+// captures in the Log Stream at D:\home\LogFiles\stdout) and re-throw so the process
+// still exits non-zero instead of failing silently.
+try
+{
+    builder.ConfigureDatabaseServices();
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine("Fatal startup error while configuring the database connection:");
+    Console.Error.WriteLine(ex.ToString());
+    Console.Out.WriteLine("Fatal startup error while configuring the database connection. See stderr for details.");
+    throw;
+}
 
 // Register application services
 builder.Services.AddScoped<IGameValidator, GameValidator>();
