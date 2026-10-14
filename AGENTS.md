@@ -82,8 +82,8 @@ Api/
     Exceptions/               ServiceException, ValidationException, NotFoundException
   Mapper/MatchMapper.cs       Match -> DTO mapping, stats, winner calculation
   Extensions/                 DatabaseSetup (connection + init), DatabaseConnectionInfo, DatabaseInitializationState
-  Sql/Triggers/SqlTriggers.cs PL/pgSQL functions/triggers as string constants
-  Migrations/                 EF Core migrations
+  Sql/TEST_TRIGGERS_CLEAN.sql  Manual trigger acceptance script (not compiled)
+  Migrations/                 EF Core migrations (trigger functions/triggers live here)
   Validations/GameValidation.cs  DEAD CODE (see ROADMAP) — do not extend
 Api.Tests/
   Services/                   Unit tests (EF Core InMemory) — GameService/MatchService/MatchDataPointService
@@ -162,11 +162,11 @@ startup.
 
 ### Startup initialization & degraded mode
 
-`Program.cs` calls `app.InitializeDatabase()`, which runs `Database.Migrate()`
-and then creates the PL/pgSQL functions/triggers via `ExecuteSqlRaw`. Triggers
-are created **only when `Database.IsRelational()`** — the unit tests' InMemory
-provider skips them, so **trigger behavior can only be validated by integration
-tests**.
+`Program.cs` calls `app.InitializeDatabase()`, which runs `Database.Migrate()`.
+The PL/pgSQL functions/triggers are defined **inside the migrations** (see
+`Migrations/*_AddMatchCountTriggers.cs`), so no separate startup DDL runs; the
+unit tests' InMemory provider never applies them, so **trigger behavior can only
+be validated by integration tests**.
 
 If migrations fail, the app logs `Critical` and (unless
 `Database:FailFastOnStartup=true`) keeps running in **degraded mode** so
@@ -180,9 +180,10 @@ dotnet ef migrations add <Name>
 dotnet ef database update
 ```
 
-Do **not** hand-edit `Migrations/*.Designer.cs` or the model snapshot. Triggers
-are currently created at startup (not in migrations); moving them into
-migrations is a known P3 item in `ROADMAP.md`.
+Do **not** hand-edit `Migrations/*.Designer.cs` or the model snapshot. The
+denormalized-counter PL/pgSQL functions/triggers are created by the
+`AddMatchCountTriggers` migration (embedded SQL; do not edit an applied
+migration).
 
 ## Testing conventions
 
@@ -193,7 +194,7 @@ migrations is a known P3 item in `ROADMAP.md`.
   the Docker DB on port 5433.
 - Test data lives in `Api.Tests/Data/*.json`, loaded via `TestBase.GetDto<T>` and
   copied to the output directory.
-- Totals: **48 unit + 58 integration = 106**. `TESTING.md` has the per-class
+- Totals: **48 unit + 59 integration = 107**. `TESTING.md` has the per-class
   breakdown and run commands; keep it in sync when you add tests.
 
 ## CI/CD
@@ -246,7 +247,7 @@ belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
 - Prefer unit tests when the logic can be asserted without the DB; use
   integration tests when trigger side effects or real Postgres behavior matter.
 - When you add or remove tests, update the counts and per-class breakdown in
-  `Api.Tests/TESTING.md` (currently **48 unit + 58 integration = 106**) and the
+  `Api.Tests/TESTING.md` (currently **48 unit + 59 integration = 107**) and the
   totals in this file.
 
 ## Known tech debt (don't accidentally make it worse)
@@ -255,7 +256,6 @@ belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
   `Services/Validators/GameValidator.cs`).
 - `GET /games-with-matches-and-data-points` bypasses the service layer and
   repeats mapping/winner logic inline.
-- Triggers are created at app startup rather than in migrations.
 - Some duplicated DTO/mapping code (see `TODO`s in `GetGameEndpoints.cs`) and
   the misspelled `isFinished` property name (kept for API compatibility).
 

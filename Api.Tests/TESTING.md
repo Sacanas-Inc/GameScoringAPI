@@ -4,12 +4,12 @@ How to run and understand the tests for GameScoringAPI.
 
 ## Overview
 
-The suite has **106 tests** split into two categories:
+The suite has **107 tests** split into two categories:
 
 | Category | Count | Needs Docker? | Location |
 | --- | ---: | :---: | --- |
 | **Unit** — service/business logic on EF Core InMemory | 48 | No | `Api.Tests/Services/`, `Api.Tests/Extensions/` |
-| **Integration** — real endpoints against PostgreSQL | 58 | Yes | `Api.Tests/Tests/` |
+| **Integration** — real endpoints against PostgreSQL | 59 | Yes | `Api.Tests/Tests/` |
 
 Unit tests are fast and isolated (each gets its own in-memory database).
 Integration tests validate real HTTP behavior **including the PL/pgSQL trigger
@@ -122,7 +122,7 @@ dotnet test Api.Tests/Api.Tests.csproj
 ### Run only the integration suites
 
 ```bash
-dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests"
+dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests|TriggerMigrationTests"
 ```
 
 Or a single suite:
@@ -168,6 +168,9 @@ validates trigger behavior. `TestBase` creates a **unique database per test**
 - `MatchDataPointPutTests` (5): valid `204`, partial update, non-existing `404`, change player name, change `MatchId` with existing data `400`
 - `MatchDataPointDeleteTests` (8): delete valid, non-existing `404`, trigger updates `PlayerCount`, deleting several from one match, bulk delete all-valid `204`, mixed valid/invalid multi-status, all-invalid multi-status, empty `400`
 
+**`Tests/Triggers/` (1)**
+- `TriggerMigrationTests` (1): applying migrations alone (no application startup) creates the four `trg_*` triggers/functions and they maintain `Games.MatchesCount` / `Matches.PlayerCount` on insert/delete
+
 ## Test structure
 
 ```
@@ -189,11 +192,13 @@ Api.Tests/
 │   │   ├── MatchPostTests.cs              (4)
 │   │   ├── MatchPutTests.cs               (4)
 │   │   └── MatchDeleteTests.cs            (4)
-│   └── MatchDataPoints/
-│       ├── MatchDataPointGetTests.cs      (6)
-│       ├── MatchDataPointPostTests.cs     (5)
-│       ├── MatchDataPointPutTests.cs      (5)
-│       └── MatchDataPointDeleteTests.cs   (8)
+│   ├── MatchDataPoints/
+│   │   ├── MatchDataPointGetTests.cs      (6)
+│   │   ├── MatchDataPointPostTests.cs     (5)
+│   │   ├── MatchDataPointPutTests.cs      (5)
+│   │   └── MatchDataPointDeleteTests.cs   (8)
+│   └── Triggers/
+│       └── TriggerMigrationTests.cs       (1)
 └── Data/
     └── GamesData.json                     # seed data, copied to test output
 ```
@@ -218,8 +223,8 @@ dotnet test Api.Tests/Api.Tests.csproj
 # Unit only (no Docker) — 48 tests
 dotnet test Api.Tests/Api.Tests.csproj --filter "ServiceTests|DatabaseConnectionInfoTests|DatabaseInitializationStateTests"
 
-# Integration only (requires Docker) — 58 tests
-dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests"
+# Integration only (requires Docker) — 59 tests
+dotnet test Api.Tests/Api.Tests.csproj --filter "GameGetTests|GamePostTests|GameDeleteTests|MatchGetTests|MatchPostTests|MatchPutTests|MatchDeleteTests|MatchDataPointGetTests|MatchDataPointPostTests|MatchDataPointPutTests|MatchDataPointDeleteTests|TriggerMigrationTests"
 
 # Single class
 dotnet test Api.Tests/Api.Tests.csproj --filter "MatchGetTests"

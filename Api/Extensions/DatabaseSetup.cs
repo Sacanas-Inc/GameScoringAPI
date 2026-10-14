@@ -85,8 +85,8 @@ public static class DatabaseSetup
     }
 
     /// <summary>
-    /// Apply migrations and create PL/pgSQL functions + triggers for Postgres.
-    /// Safe to call multiple times - checks if functions/triggers exist before creating.
+    /// Apply migrations (which now include the PL/pgSQL functions and triggers) for Postgres.
+    /// Safe to call multiple times.
     ///
     /// On migration failure the app logs a critical error and, unless Database:FailFastOnStartup is true,
     /// continues in degraded mode so the health endpoint can report the failure instead of a bare 500.30.
@@ -144,38 +144,6 @@ public static class DatabaseSetup
                 "Continuing in degraded mode: database endpoints will fail and GET /health will report Unhealthy. " +
                 "Set 'Database:FailFastOnStartup' to true to crash on startup instead.");
             return;
-        }
-
-        if (dbContext.Database.IsRelational())
-        {
-            try
-            {
-                // Create PL/pgSQL functions (using CREATE OR REPLACE for idempotency)
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsertFunction);
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDeleteFunction);
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsertFunction);
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDeleteFunction);
-
-                // Create triggers (drop if exists first to avoid conflicts)
-                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_game_match_count_insert ON \"Match\" CASCADE;");
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerInsert);
-
-                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_game_match_count_delete ON \"Match\" CASCADE;");
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesTriggerDelete);
-
-                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_match_player_count_insert ON \"MatchDataPoint\" CASCADE;");
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerInsert);
-
-                dbContext.Database.ExecuteSqlRaw("DROP TRIGGER IF EXISTS update_match_player_count_delete ON \"MatchDataPoint\" CASCADE;");
-                dbContext.Database.ExecuteSqlRaw(SqlTriggers.MatchesDataPointTriggerDelete);
-
-                logger.LogInformation("Database triggers and functions ensured.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Error creating database triggers/functions.");
-                // Don't throw - continue if triggers already exist
-            }
         }
 
         state.MarkSucceeded();
