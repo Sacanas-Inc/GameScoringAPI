@@ -84,7 +84,6 @@ Api/
   Extensions/                 DatabaseSetup (connection + init), DatabaseConnectionInfo, DatabaseInitializationState
   Sql/TEST_TRIGGERS_CLEAN.sql  Manual trigger acceptance script (not compiled)
   Migrations/                 EF Core migrations (trigger functions/triggers live here)
-  Validations/GameValidation.cs  DEAD CODE (see ROADMAP) — do not extend
 Api.Tests/
   Services/                   Unit tests (EF Core InMemory) — GameService/MatchService/MatchDataPointService
   Tests/                      Integration tests (real Postgres) — Games/Matches/MatchDataPoints + TestBase
@@ -252,8 +251,6 @@ belong in `BREAKING_CHANGES.md` or `ROADMAP.md`.
 
 ## Known tech debt (don't accidentally make it worse)
 
-- `Api/Validations/GameValidation.cs` is unreferenced dead code (superseded by
-  `Services/Validators/GameValidator.cs`).
 - `GET /games-with-matches-and-data-points` bypasses the service layer and
   repeats mapping/winner logic inline.
 - Some duplicated DTO/mapping code (see `TODO`s in `GetGameEndpoints.cs`) and
